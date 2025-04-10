@@ -1,0 +1,60 @@
+.auth-section {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+}
+
+.container {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.role-cards {
+  display: flex;
+  flex-direction: row;
+  gap: 1.5rem;
+  margin-top: 2rem;
+  justify-content: center;
+}
+
+.role-card {
+  padding: 1.5rem;
+  border-radius: 8px;
+  background: var(--card-bg);
+  cursor: pointer;
+  transition: transform 0.2s ease;
+  flex: 1;
+  max-width: 300px;
+  color: white;
+  border: 1px solid rgba(255,255,255,0.1);
+}
+
+.role-card h3 {
+  color: white;
+  margin-bottom: 0.5rem;
+}
+
+.role-card p {
+  color: rgba(255,255,255,0.8);
+}
+
+.role-card:hover {
+  transform: translateY(-5px);
+  background: rgba(255,255,255,0.1);
+}
+
+h2 {
+  color: white;
+  font-size: 2rem;
+  margin-bottom: 0.5rem;
+}
+
+.lead {
+  color: rgba(255,255,255,0.8);
+  font-size: 1.1rem;
+  margin-bottom: 2rem;
+}

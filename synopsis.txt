@@ -1,0 +1,68 @@
+PROBLEM STATEMENT
+In today’s competitive job market, students and fresh graduates struggle to find internships and
+entry-level jobs that truly match their skills and career aspirations. While numerous platforms
+provide job listings, they are often cluttered with irrelevant content, self-promotional posts, and
+networking noise, making it difficult to access genuine opportunities and expert guidance.
+Many students remain unaware of the specific skills, resume optimizations, and industry
+expectations that could set them apart. Traditional career counseling is often costly, generic, or
+inaccessible, leaving them without personalized feedback or direct access to hiring professionals.
+There is a pressing need for a focused, mentorship-driven platform that connects students
+directly with HR professionals and technical experts from top companies. By offering
+AI-powered resume analysis, career coaching, expert consultations, and direct access to curated
+job listings, this system cuts through the clutter and streamlines the job search process,
+significantly improving students’ chances of securing meaningful internships and jobs.
+
+OBJECTIVE
+Kairos (Greek: "the right or opportune moment") is a mentorship-driven career platform
+designed to connect students with HR professionals and industry experts from top companies. It
+ensures that students make the right career moves at the right time, seizing opportunities when
+they matter most. Unlike traditional job portals cluttered with irrelevant posts and distractions,
+Kairos focuses solely on what truly matters—helping students secure internships and entry-level
+jobs efficiently. By offering personalized resume analysis, AI-powered optimization, interview
+preparation, and tailored job recommendations, Kairos provides clear, actionable insights without
+unnecessary content.
+The platform facilitates one-on-one mentorship, Q&A sessions, real-time discussions, and
+skill-building guidance, bridging the gap between aspiring candidates and recruiters. With a
+distraction-free, insight-first approach, Kairos eliminates networking noise and streamlines the
+job search process. By integrating expert-driven career support with curated job listings, Kairos
+ensures students seize the right opportunities at the right time, maximizing their chances of
+success.
+
+FEATURES
+1. Seamless Onboarding & Profile Setup
+● New Users: Register, create a profile with education, skills, and experience.
+● AI Resume Parsing: Upload CV for automatic extraction and editing.
+● Profile Completion Tracker: Displays percentage of profile completion.
+2. AI-Powered Resume Optimization & Feedback
+● Resume Analysis: AI scans resumes, highlights gaps, and suggests improvements.
+● Technical Manager Feedback: Video-based feedback and resume annotations focused on
+technical skills and improvements.
+● Hiring Manager Feedback: Suggestions on overall presentation, role alignment, and
+industry expectations.
+3. Smart Job & Internship Matching
+● Personalized Job Recommendations: AI suggests opportunities based on skills and
+interests.
+● Application Tracking: Status updates (applied, shortlisted, rejected).
+● Reminders & Follow-Ups: Notifications for interviews and deadlines.
+4. Direct Engagement with Hiring and Technical Experts
+● Live Q&A Sessions & AMAs:
+○ Hiring Managers: Career guidance, hiring trends, job market insights.
+○ Technical Managers: Resume structuring, skill-building, and interview prep.
+● One-on-One Mentorship:
+○ Hiring Managers for recruitment strategy & soft skills.
+○ Technical Managers for technical assessments & role-specific advice.
+5. In-App Chat System
+● Chat with Hiring and Technical Managers & Peers: One-on-one or group discussions.
+● Existing Chats & New Conversations: Easy access to ongoing discussions.
+6. Secure Login & Profile Management
+● Role-Based Access: Student, Hiring/Technical Manager, Admin.
+● Multi-Factor Authentication: Ensures data security.
+7. Manager Dashboard (For Hiring & Technical Managers)
+3
+● View Student Profiles & Resumes: Search candidates based on skillsets.
+● Hiring Managers: Shortlist candidates, schedule interviews.
+● Technical Managers: Provide feedback, recommend upskilling paths.
+● Track Application Progress: Monitor student hiring pipeline.
+8. Admin Moderation & Analytics
+● User & Content Management: Approve accounts, remove inappropriate content.
+● Engagement Reports: Monitor platform usage and trends.

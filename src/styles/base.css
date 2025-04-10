@@ -1,0 +1,112 @@
+/* Global variables and base styles */
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=DM+Sans:wght@400;500;700&display=swap');
+
+:root {
+  --primary-color: #6a5acd;
+  --secondary-color: #1a1a2e;
+  --accent-color: #9d4edd;
+  --highlight-color: #ff6bd6;
+  --text-color: #ffffff;
+  --light-text: #d1d5db;
+  --dark-blue: #0f0e17;
+  --white: #ffffff;
+  --shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+  --font-heading: 'Space Grotesk', sans-serif;
+  --font-body: 'DM Sans', sans-serif;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: var(--dark-blue);
+  color: var(--text-color);
+  margin: 0;
+  font-family: var(--font-body);
+  line-height: 1.6;
+  text-shadow: 0 0 2px rgba(255,255,255,0.3);
+}
+
+h1, h2, h3, h4, h5, h6 {
+  text-shadow: 0 0 5px rgba(255,255,255,0.5);
+}
+
+.app-container {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Global animations */
+@keyframes gradientBG {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  25% {
+    transform: translateY(-30px) rotate(5deg);
+  }
+  50% {
+    transform: translateY(0) rotate(0deg);
+  }
+  75% {
+    transform: translateY(30px) rotate(-5deg);
+  }
+}
+
+/* Scroll Animation */
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(50px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.scroll-animate {
+  animation: slideUp 0.8s ease forwards;
+}
+
+[data-scroll] {
+  opacity: 0;
+  transform: translateY(20px);
+  transition: all 0.6s ease-out;
+}
+
+[data-scroll="in"] {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Animate all text elements */
+[data-scroll] h1,
+[data-scroll] h2,
+[data-scroll] h3,
+[data-scroll] h4,
+[data-scroll] p,
+[data-scroll] li,
+[data-scroll] span {
+  opacity: 0;
+  transform: translateY(20px);
+  transition: all 0.6s ease-out var(--delay);
+}
+
+[data-scroll="in"] h1,
+[data-scroll="in"] h2,
+[data-scroll="in"] h3,
+[data-scroll="in"] h4,
+[data-scroll="in"] p,
+[data-scroll="in"] li,
+[data-scroll="in"] span {
+  opacity: 1;
+  transform: translateY(0);
+}
