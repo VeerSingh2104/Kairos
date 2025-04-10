@@ -182,6 +182,14 @@
   border: 1px solid rgba(255, 255, 255, 0.1);
   position: relative;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.pricing-card .cta-button {
+  margin-top: auto;
+  position: relative;
+  z-index: 2;
 }
 
 .pricing-card::before {
@@ -309,6 +317,31 @@
 
 .submit-btn:hover {
   background: var(--dark-blue);
+}
+
+/* Form submission states */
+.form-submitted {
+  display: none;
+  text-align: center;
+  padding: 2rem;
+  background: rgba(76, 175, 80, 0.1);
+  border-radius: 4px;
+  margin-top: 1rem;
+}
+
+.form-submitted.show {
+  display: block;
+}
+
+.form-error {
+  color: #f44336;
+  font-size: 0.9rem;
+  margin-top: 0.5rem;
+  display: none;
+}
+
+.form-error.show {
+  display: block;
 }
 
 /* CTA Button */

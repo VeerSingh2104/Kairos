@@ -222,6 +222,12 @@ export default function LandingPage() {
               <li>Basic resume review</li>
               <li>Limited mentor connections</li>
             </ul>
+            <button 
+              className="cta-button"
+              onClick={() => window.location.href = 'https://payment.example.com/checkout?plan=basic'}
+            >
+              Buy Now
+            </button>
           </div>
           <div className="pricing-card">
             <h3>Premium</h3>
@@ -231,24 +237,55 @@ export default function LandingPage() {
               <li>AI-powered resume optimization</li>
               <li>Unlimited mentor connections</li>
             </ul>
+            <button 
+              className="cta-button"
+              onClick={() => window.location.href = 'https://payment.example.com/checkout?plan=premium'}
+            >
+              Buy Now
+            </button>
           </div>
         </div>
       </section>
 
       <section id="contact" className="contact-section">
         <h2>Contact Us</h2>
-        <form className="contact-form">
+        <form 
+          className="contact-form"
+          action="https://formsubmit.co/singh.lakshya2104@gmail.com" 
+          method="POST"
+        >
+          <input type="hidden" name="_subject" value="New contact from Kairos website" />
+          <input type="hidden" name="_template" value="box" />
+          <input type="hidden" name="_captcha" value="false" />
+          
           <div className="form-group">
             <label htmlFor="name">Name</label>
-            <input type="text" id="name" placeholder="Your name" />
+            <input 
+              type="text" 
+              id="name" 
+              name="name" 
+              placeholder="Your name" 
+              required 
+            />
           </div>
           <div className="form-group">
             <label htmlFor="email">Email</label>
-            <input type="email" id="email" placeholder="Your email" />
+            <input 
+              type="email" 
+              id="email" 
+              name="email" 
+              placeholder="Your email" 
+              required 
+            />
           </div>
           <div className="form-group">
             <label htmlFor="message">Message</label>
-            <textarea id="message" placeholder="Your message"></textarea>
+            <textarea 
+              id="message" 
+              name="message" 
+              placeholder="Your message" 
+              required
+            ></textarea>
           </div>
           <button type="submit" className="submit-btn">Send Message</button>
         </form>
