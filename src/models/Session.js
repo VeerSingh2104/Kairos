@@ -1,31 +1,49 @@
-import mongoose from 'mongoose';
+// Session model using Firebase Firestore
+import { getFirestore, collection, doc, setDoc, getDoc } from 'firebase/firestore';
+import { initializeApp } from 'firebase/app';
 
-const sessionSchema = new mongoose.Schema({
-  userId: { 
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true 
+const firebaseConfig = {
+  apiKey: "AIzaSyBGkHZEIKNmh1LAXu1D6kn02eUqSjhIE7M",
+  authDomain: "kairos-cc7cd.firebaseapp.com",
+  projectId: "kairos-cc7cd",
+  storageBucket: "kairos-cc7cd.firebasestorage.app",
+  messagingSenderId: "396286230303",
+  appId: "1:396286230303:web:472ca65acd99087ab47a2a",
+  measurementId: "G-0CL6WV9YSY"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+
+const db = getFirestore(app);
+const sessionsCollection = collection(db, 'sessions');
+
+const Session = {
+  async create(sessionData) {
+    try {
+      const sessionRef = doc(sessionsCollection);
+      await setDoc(sessionRef, {
+        ...sessionData,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      });
+      return sessionRef.id;
+    } catch (error) {
+      console.error('Error creating session:', error);
+      throw error;
+    }
   },
-  token: { 
-    type: String,
-    required: true,
-    unique: true
-  },
-  expiresAt: {
-    type: Date,
-    required: true
-  },
-  ipAddress: String,
-  userAgent: String,
-  createdAt: {
-    type: Date,
-    default: Date.now
+
+  async getById(id) {
+    try {
+      const sessionRef = doc(sessionsCollection, id);
+      const sessionSnap = await getDoc(sessionRef);
+      return sessionSnap.exists() ? { id: sessionSnap.id, ...sessionSnap.data() } : null;
+    } catch (error) {
+      console.error('Error getting session:', error);
+      throw error;
+    }
   }
-});
-
-// Auto-delete expired sessions
-sessionSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
-
-const Session = mongoose.model('Session', sessionSchema);
+};
 
 export default Session;
