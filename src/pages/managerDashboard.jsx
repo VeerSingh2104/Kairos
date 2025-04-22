@@ -1,9 +1,9 @@
 import { signOut } from 'firebase/auth';
-import { auth } from '../../firebase';
+import { auth } from '../firebase';
 import { useNavigate } from 'react-router-dom';
-import '../../styles/components/dashboard.css';
+import '../styles/components/components.css';
 
-function CandidateDashboard() {
+function ManagerDashboard() {
   const navigate = useNavigate();
 
   const handleLogout = async () => {
@@ -18,7 +18,7 @@ function CandidateDashboard() {
   return (
     <div className="dashboard">
       <header className="dashboard-header">
-        <h1>Candidate Dashboard</h1>
+        <h1>Manager Dashboard</h1>
         <button 
           className="logout-btn"
           onClick={handleLogout}
@@ -28,10 +28,10 @@ function CandidateDashboard() {
       </header>
       
       <main>
-        <p>Welcome to your candidate dashboard</p>
+        <p>Welcome to your manager dashboard</p>
       </main>
     </div>
   );
 }
 
-export default CandidateDashboard;
+export default ManagerDashboard;

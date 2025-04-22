@@ -1,24 +1,73 @@
-import mongoose from 'mongoose';
+// User model using Firebase Firestore
+import { getFirestore, collection, doc, setDoc, getDoc, updateDoc } from 'firebase/firestore';
+import { firebaseApp } from '../firebase';
 
-const userSchema = new mongoose.Schema({
-  email: { type: String, required: true, unique: true },
-  password: { type: String, required: true },
-  role: { type: String, enum: ['admin', 'manager', 'candidate'], required: true },
-  createdAt: { type: Date, default: Date.now },
-  updatedAt: { type: Date, default: Date.now },
-  profile: {
-    firstName: String,
-    lastName: String,
-    avatar: String
+const db = getFirestore(firebaseApp);
+
+const defaultProfileData = {
+  fullName: '',
+  jobTitle: '',
+  skills: [],
+  bio: '',
+  avatar: null,
+  completedSteps: 0,
+  totalSteps: 5
+};
+
+const usersCollection = collection(db, 'users');
+
+const User = {
+  async create(userId, userData) {
+    try {
+      const userWithProfile = {
+        ...userData,
+        profileComplete: false,
+        profileData: defaultProfileData,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+      await setDoc(doc(usersCollection, userId), userWithProfile);
+      return userId;
+    } catch (error) {
+      console.error('Error creating user:', error);
+      throw error;
+    }
+  },
+
+  async getById(id) {
+    try {
+      const userRef = doc(usersCollection, id);
+      const userSnap = await getDoc(userRef);
+      return userSnap.exists() ? { id: userSnap.id, ...userSnap.data() } : null;
+    } catch (error) {
+      console.error('Error getting user:', error);
+      throw error;
+    }
+  },
+
+  async updateProfile(userId, profileData) {
+    try {
+      await updateDoc(doc(usersCollection, userId), {
+        profileData,
+        updatedAt: new Date()
+      });
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      throw error;
+    }
+  },
+
+  async markProfileComplete(userId) {
+    try {
+      await updateDoc(doc(usersCollection, userId), {
+        'profileComplete': true,
+        updatedAt: new Date()
+      });
+    } catch (error) {
+      console.error('Error marking profile complete:', error);
+      throw error;
+    }
   }
-});
-
-// Update the updatedAt field before saving
-userSchema.pre('save', function(next) {
-  this.updatedAt = Date.now();
-  next();
-});
-
-const User = mongoose.model('User', userSchema);
+};
 
 export default User;

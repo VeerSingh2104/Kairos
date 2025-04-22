@@ -5,7 +5,6 @@ import {
   signInWithEmailAndPassword 
 } from 'firebase/auth';
 import { auth, googleProvider, facebookProvider } from '../../firebase';
-import Session from '../../models/Session';
 import '../../styles/components/auth.css'
 
 function Login() {
@@ -14,26 +13,43 @@ function Login() {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [emailError, setEmailError] = useState('');
+  const [passwordError, setPasswordError] = useState('');
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        const email = e.target.email.value;
-        const password = e.target.password.value;
+  const validateEmail = (email) => {
+    const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return re.test(email);
+  };
 
-        try {
+  const validatePassword = (password) => {
+    return password.length >= 8;
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    const email = e.target.email.value;
+    const password = e.target.password.value;
+
+    // Reset errors
+    setEmailError('');
+    setPasswordError('');
+    setError('');
+
+    // Validate inputs
+    if (!validateEmail(email)) {
+      setEmailError('Please enter a valid email address');
+      return;
+    }
+
+    if (!validatePassword(password)) {
+      setPasswordError('Password must be at least 8 characters');
+      return;
+    }
+
+    try {
             // Handle email/password login logic here
             const userCredential = await signInWithEmailAndPassword(auth, email, password);
             const user = userCredential.user;
-
-            // Create a session in MongoDB
-            const session = new Session({
-                userId: user.uid,
-                token: user.accessToken,
-                expiresAt: new Date(Date.now() + 3600000), // 1 hour expiration
-                ipAddress: '', // Optionally capture IP
-                userAgent: navigator.userAgent
-            });
-            await session.save();
 
             navigate(`/${role}/dashboard`, { replace: true });
         } catch (error) {
@@ -48,15 +64,7 @@ function Login() {
       const result = await signInWithPopup(auth, googleProvider);
       const user = result.user;
       
-      // Create session for Google login
-      const session = new Session({
-        userId: user.uid,
-        token: user.accessToken,
-        expiresAt: new Date(Date.now() + 3600000),
-        userAgent: navigator.userAgent
-      });
-      await session.save();
-      
+      // Successful login - redirect to dashboard
       navigate(`/${role}/dashboard`, { replace: true });
     } catch (error) {
       console.error('Google login error:', error);
@@ -72,15 +80,7 @@ function Login() {
       const result = await signInWithPopup(auth, facebookProvider);
       const user = result.user;
       
-      // Create session for Facebook login
-      const session = new Session({
-        userId: user.uid,
-        token: user.accessToken,
-        expiresAt: new Date(Date.now() + 3600000),
-        userAgent: navigator.userAgent
-      });
-      await session.save();
-      
+      // Successful login - redirect to dashboard
       navigate(`/${role}/dashboard`, { replace: true });
     } catch (error) {
       console.error('Facebook login error:', error);
@@ -98,18 +98,18 @@ function Login() {
         {loading && <div className="auth-loading">Loading...</div>}
         
         <div className="social-auth-buttons">
-          <button 
+          <button className="social-button google-btn" 
             type="button" 
-            className="google-btn"
             onClick={handleGoogleLogin}
           >
+            <img src="/src/assets/images/logos/google-logo.png" alt="Google Logo" className="social-logo" />
             Continue with Google
           </button>
-          <button 
+          <button className="social-button facebook-btn"
             type="button" 
-            className="facebook-btn"
             onClick={handleFacebookLogin}
           >
+            <img src="/src/assets/images/logos/Facebook_logo.svg" alt="Facebook Logo" className="social-logo" />
             Continue with Facebook
           </button>
         </div>
@@ -126,7 +126,15 @@ function Login() {
               id="email" 
               placeholder={`Enter your ${role} email`}
               required
+              onChange={(e) => {
+                if (!validateEmail(e.target.value)) {
+                  setEmailError('Please enter a valid email');
+                } else {
+                  setEmailError('');
+                }
+              }}
             />
+            {emailError && <div className="validation-error">{emailError}</div>}
           </div>
           
           <div className="form-group">
@@ -136,7 +144,15 @@ function Login() {
               id="password" 
               placeholder="Enter your password"
               required
+              onChange={(e) => {
+                if (!validatePassword(e.target.value)) {
+                  setPasswordError('Password must be at least 8 characters');
+                } else {
+                  setPasswordError('');
+                }
+              }}
             />
+            {passwordError && <div className="validation-error">{passwordError}</div>}
           </div>
           
           <button type="submit" className="submit-btn">
