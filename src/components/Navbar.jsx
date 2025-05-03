@@ -28,8 +28,8 @@ const Navbar = () => {
   return (
     <nav className="navbar sticky-navbar">
       <div className="nav-container">
-        <div className="logo">
-          <Link to="/">Kairos</Link>
+      <div className="logo">
+        <Link to="/">Kairos</Link>
         </div>
         <ul className="nav-links">
           <li><Link to="/about">About Us</Link></li>

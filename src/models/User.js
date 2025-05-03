@@ -47,10 +47,12 @@ const User = {
 
   async updateProfile(userId, profileData) {
     try {
+      console.log(`Updating profile for user ${userId} with data:`, profileData);
       await updateDoc(doc(usersCollection, userId), {
         profileData,
         updatedAt: new Date()
       });
+      console.log(`Profile updated successfully for user ${userId}`);
     } catch (error) {
       console.error('Error updating profile:', error);
       throw error;
