@@ -1,8 +1,9 @@
 import { useParams, useNavigate } from 'react-router-dom'
 import { useState } from 'react'
-import { signInWithPopup } from 'firebase/auth'
+import { signInWithPopup, createUserWithEmailAndPassword } from 'firebase/auth'
 import { auth, googleProvider, facebookProvider } from '../../firebase'
 import Session from '../../models/Session'
+import User from '../../models/User'
 import '../../styles/components/auth.css'
 
 function Signup() {
@@ -67,7 +68,10 @@ function Signup() {
       // Handle signup logic here
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
-      
+
+      // Create user document with role
+      await User.create(user.uid, { role });
+
       navigate('/auth/success', { replace: true });
     } catch (error) {
       console.error('Signup error:', error);
@@ -81,8 +85,13 @@ function Signup() {
       setError('');
       const result = await signInWithPopup(auth, googleProvider);
       const user = result.user;
-      
-      // Successful login - redirect to dashboard
+
+      // Create user document with role if not exists
+      const existingUser = await User.getById(user.uid);
+      if (!existingUser) {
+        await User.create(user.uid, { role });
+      }
+
       navigate(`/${role}/dashboard`, { replace: true });
     } catch (error) {
       console.error('Google login error:', error);
@@ -103,7 +112,7 @@ function Signup() {
       setLoading(true)
       const result = await signInWithPopup(auth, facebookProvider)
       const user = result.user
-      
+
       const session = new Session({
         userId: user.uid,
         token: user.accessToken,
@@ -111,7 +120,13 @@ function Signup() {
         userAgent: navigator.userAgent
       })
       await session.save()
-      
+
+      // Create user document with role if not exists
+      const existingUser = await User.getById(user.uid);
+      if (!existingUser) {
+        await User.create(user.uid, { role });
+      }
+
       navigate(`/${role}/dashboard`, { replace: true })
     } catch (error) {
       console.error('Facebook login error:', error)
@@ -126,7 +141,7 @@ function Signup() {
     <section className="auth-section">
       <div className="container">
         <h2>Sign up as {role}</h2>
-        
+
         <div className="social-auth-buttons">
           <button className="social-button google-btn" 
             type="button" 
@@ -143,7 +158,7 @@ function Signup() {
             Continue with Facebook
           </button>
         </div>
-        
+
         <div className="auth-divider">
           <span>OR</span>
         </div>
@@ -166,7 +181,7 @@ function Signup() {
             />
             {nameError && <div className="validation-error">{nameError}</div>}
           </div>
-          
+
           <div className="form-group">
             <label htmlFor="email">Email</label>
             <input 
@@ -184,7 +199,7 @@ function Signup() {
             />
             {emailError && <div className="validation-error">{emailError}</div>}
           </div>
-          
+
           <div className="form-group">
             <label htmlFor="password">Password</label>
             <input 
@@ -202,7 +217,7 @@ function Signup() {
             />
             {passwordError && <div className="validation-error">{passwordError}</div>}
           </div>
-          
+
           <div className="form-group">
             <label htmlFor="confirm-password">Confirm Password</label>
             <input 
@@ -220,11 +235,11 @@ function Signup() {
             />
             {confirmPasswordError && <div className="validation-error">{confirmPasswordError}</div>}
           </div>
-          
+
           <button type="submit" className="submit-btn">
             Create Account
           </button>
-          
+
           <p style={{ marginTop: '1rem', color: 'var(--light-text)' }}>
             Already have an account?{' '}
             <span 

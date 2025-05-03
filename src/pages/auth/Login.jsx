@@ -5,6 +5,7 @@ import {
   signInWithEmailAndPassword 
 } from 'firebase/auth';
 import { auth, googleProvider, facebookProvider } from '../../firebase';
+import User from '../../models/User';
 import '../../styles/components/auth.css'
 
 function Login() {
@@ -23,6 +24,30 @@ function Login() {
 
   const validatePassword = (password) => {
     return password.length >= 8;
+  };
+
+  const redirectAfterLogin = async (user) => {
+    try {
+      const userData = await User.getById(user.uid);
+      if (userData) {
+        if (userData.role !== role) {
+          setError(`You are not authorized to login as ${role}`);
+          await auth.signOut();
+          return;
+        }
+        if (userData.profileComplete) {
+          navigate(`/${role}/dashboard`, { replace: true });
+        } else {
+          navigate('/profile-setup', { replace: true });
+        }
+      } else {
+        setError('User data not found');
+        await auth.signOut();
+      }
+    } catch (error) {
+      console.error('Error fetching user data:', error);
+      setError('Failed to fetch user data');
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -47,25 +72,23 @@ function Login() {
     }
 
     try {
-            // Handle email/password login logic here
-            const userCredential = await signInWithEmailAndPassword(auth, email, password);
-            const user = userCredential.user;
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
 
-            navigate(`/${role}/dashboard`, { replace: true });
-        } catch (error) {
-            console.error('Login error:', error);
-            setError('Failed to login');
-        }
+      await redirectAfterLogin(user);
+    } catch (error) {
+      console.error('Login error:', error);
+      setError('Failed to login');
     }
+  };
 
   const handleGoogleLogin = async () => {
     try {
       setLoading(true);
       const result = await signInWithPopup(auth, googleProvider);
       const user = result.user;
-      
-      // Successful login - redirect to dashboard
-      navigate(`/${role}/dashboard`, { replace: true });
+
+      await redirectAfterLogin(user);
     } catch (error) {
       console.error('Google login error:', error);
       setError('Failed to login with Google');
@@ -79,9 +102,8 @@ function Login() {
       setLoading(true);
       const result = await signInWithPopup(auth, facebookProvider);
       const user = result.user;
-      
-      // Successful login - redirect to dashboard
-      navigate(`/${role}/dashboard`, { replace: true });
+
+      await redirectAfterLogin(user);
     } catch (error) {
       console.error('Facebook login error:', error);
       setError('Failed to login with Facebook');
@@ -96,7 +118,7 @@ function Login() {
         <h2>Login as {role}</h2>
         {error && <div className="auth-error">{error}</div>}
         {loading && <div className="auth-loading">Loading...</div>}
-        
+
         <div className="social-auth-buttons">
           <button className="social-button google-btn" 
             type="button" 
@@ -113,7 +135,7 @@ function Login() {
             Continue with Facebook
           </button>
         </div>
-        
+
         <div className="auth-divider">
           <span>OR</span>
         </div>
@@ -136,7 +158,7 @@ function Login() {
             />
             {emailError && <div className="validation-error">{emailError}</div>}
           </div>
-          
+
           <div className="form-group">
             <label htmlFor="password">Password</label>
             <input 
@@ -154,11 +176,11 @@ function Login() {
             />
             {passwordError && <div className="validation-error">{passwordError}</div>}
           </div>
-          
+
           <button type="submit" className="submit-btn">
             Login
           </button>
-          
+
           <p style={{ marginTop: '1rem', color: 'var(--light-text)' }}>
             Don't have an account?{' '}
             <span 

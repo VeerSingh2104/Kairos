@@ -41,12 +41,13 @@ function CandidateDashboard() {
     return () => unsubscribe();
   }, [navigate]);
 
-  useEffect(() => {
-    if (profileComplete) {
-      // Redirect to main dashboard if profile is complete
-      navigate('/dashboard/main', { replace: true });
-    }
-  }, [profileComplete, navigate]);
+  // Removed redirect to /dashboard/main to prevent blank page
+  // useEffect(() => {
+  //   if (profileComplete) {
+  //     // Redirect to main dashboard if profile is complete
+  //     navigate('/dashboard/main', { replace: true });
+  //   }
+  // }, [profileComplete, navigate]);
 
   const handleLogout = async () => {
     try {

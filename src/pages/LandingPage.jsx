@@ -128,7 +128,12 @@ export default function LandingPage() {
               <span className="stat-label">Success Rate</span>
             </div>
           </div>
-          <button className="cta-button">Get Started</button>
+          <button 
+            className="cta-button"
+            onClick={() => navigate('/auth/role-selection')}
+          >
+            Get Started
+          </button>
         </div>
         <div className="hero-image">
           <div className="floating-elements">
