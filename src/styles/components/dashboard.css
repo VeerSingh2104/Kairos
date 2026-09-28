@@ -1,3 +1,2 @@
-[object Object]
 .job-form{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:20px}.job-form label{display:flex;flex-direction:column;gap:7px;color:#9b97a8;font-size:11px}.job-form label.full{grid-column:1/-1}.job-form input,.job-form textarea{width:100%;box-sizing:border-box;padding:11px;border:1px solid rgba(255,255,255,.09);border-radius:9px;background:rgba(255,255,255,.035);color:#eee;font:13px var(--font-body)}.job-form textarea{min-height:130px;resize:vertical}.candidate-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:18px}.candidate-grid .mentor-card{min-width:0}
 @media(max-width:700px){.job-form{grid-template-columns:1fr}.job-form label.full{grid-column:auto}.candidate-grid{grid-template-columns:1fr}}
