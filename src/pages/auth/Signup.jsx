@@ -1,258 +1,93 @@
-import { useParams, useNavigate } from 'react-router-dom'
-import { useState } from 'react'
-import { signInWithPopup, createUserWithEmailAndPassword } from 'firebase/auth'
-import { auth, googleProvider, facebookProvider } from '../../firebase'
-import Session from '../../models/Session'
-import User from '../../models/User'
-import '../../styles/components/auth.css'
+import { useNavigate, useParams } from 'react-router-dom';
+import { useState } from 'react';
+import { createUserWithEmailAndPassword, signInWithPopup, updateProfile } from 'firebase/auth';
+import { auth, googleProvider } from '../../firebase';
+import User from '../../models/User';
+import '../../styles/components/auth.css';
 
-function Signup() {
-  const { role } = useParams()
-  const navigate = useNavigate()
+export default function Signup() {
+  const { role } = useParams();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [nameError, setNameError] = useState('');
-  const [emailError, setEmailError] = useState('');
-  const [passwordError, setPasswordError] = useState('');
-  const [confirmPasswordError, setConfirmPasswordError] = useState('');
 
-  const validateName = (name) => {
-    return name.length >= 2; // Minimum 2 characters
+  const finish = async (user, name = '') => {
+    const existing = await User.getById(user.uid);
+    if (existing && existing.role !== role) {
+      throw new Error(`This account is already registered as ${existing.role}.`);
+    }
+    if (!existing) {
+      await User.create(user.uid, {
+        role,
+        email: user.email || '',
+        name: name || user.displayName || ''
+      });
+    }
+    navigate('/profile-setup', { replace: true });
   };
 
-  const validateEmail = (email) => {
-    const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return re.test(email);
-  };
-
-  const validatePassword = (password) => {
-    return password.length >= 8; // Minimum 8 characters
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    const name = e.target.name.value;
-    const email = e.target.email.value;
-    const password = e.target.password.value;
-    const confirmPassword = e.target['confirm-password'].value;
-
-    // Reset errors
-    setNameError('');
-    setEmailError('');
-    setPasswordError('');
-    setConfirmPasswordError('');
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    setLoading(true);
     setError('');
+    const form = new FormData(event.currentTarget);
+    const name = String(form.get('name') || '').trim();
+    const email = String(form.get('email') || '').trim();
+    const password = String(form.get('password') || '');
+    const confirm = String(form.get('confirmPassword') || '');
 
-    // Validate inputs
-    if (!validateName(name)) {
-      setNameError('Name must be at least 2 characters');
-      return;
-    }
-
-    if (!validateEmail(email)) {
-      setEmailError('Please enter a valid email address');
-      return;
-    }
-
-    if (!validatePassword(password)) {
-      setPasswordError('Password must be at least 8 characters');
-      return;
-    }
-
-    if (password !== confirmPassword) {
-      setConfirmPasswordError('Passwords do not match');
-      return;
-    }
+    if (name.length < 2) { setError('Please enter your full name.'); setLoading(false); return; }
+    if (password.length < 8) { setError('Password must be at least 8 characters.'); setLoading(false); return; }
+    if (password !== confirm) { setError('Passwords do not match.'); setLoading(false); return; }
 
     try {
-      // Handle signup logic here
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      const user = userCredential.user;
-
-      // Create user document with role
-      await User.create(user.uid, { role });
-
-      navigate('/auth/success', { replace: true });
-    } catch (error) {
-      console.error('Signup error:', error);
-      setError('Signup not successful: ' + error.message);
-    }
-  };
-
-  const handleGoogleLogin = async () => {
-    try {
-      setLoading(true);
-      setError('');
-      const result = await signInWithPopup(auth, googleProvider);
-      const user = result.user;
-
-      // Create user document with role if not exists
-      const existingUser = await User.getById(user.uid);
-      if (!existingUser) {
-        await User.create(user.uid, { role });
-      }
-
-      navigate(`/${role}/dashboard`, { replace: true });
-    } catch (error) {
-      console.error('Google login error:', error);
-      let errorMessage = 'Failed to login with Google';
-      if (error.code === 'auth/popup-closed-by-user') {
-        errorMessage = 'Login popup was closed - please try again';
-      } else if (error.code === 'auth/account-exists-with-different-credential') {
-        errorMessage = 'This email is already registered with another method';
-      }
-      setError(errorMessage);
+      const credential = await createUserWithEmailAndPassword(auth, email, password);
+      await updateProfile(credential.user, { displayName: name });
+      await finish(credential.user, name);
+    } catch (err) {
+      const messages = {
+        'auth/email-already-in-use': 'An account with this email already exists. Try logging in.',
+        'auth/invalid-email': 'Please enter a valid email address.',
+        'auth/weak-password': 'Choose a stronger password.'
+      };
+      setError(messages[err.code] || err.message || 'Unable to create the account.');
     } finally {
       setLoading(false);
     }
-  }
+  };
 
-  const handleFacebookLogin = async () => {
+  const handleGoogle = async () => {
+    setLoading(true);
+    setError('');
     try {
-      setLoading(true)
-      const result = await signInWithPopup(auth, facebookProvider)
-      const user = result.user
-
-      const session = new Session({
-        userId: user.uid,
-        token: user.accessToken,
-        expiresAt: new Date(Date.now() + 3600000),
-        userAgent: navigator.userAgent
-      })
-      await session.save()
-
-      // Create user document with role if not exists
-      const existingUser = await User.getById(user.uid);
-      if (!existingUser) {
-        await User.create(user.uid, { role });
-      }
-
-      navigate(`/${role}/dashboard`, { replace: true })
-    } catch (error) {
-      console.error('Facebook login error:', error)
-      setError('Failed to login with Facebook')
+      const credential = await signInWithPopup(auth, googleProvider);
+      await finish(credential.user, credential.user.displayName || '');
+    } catch (err) {
+      setError(err.message || 'Google sign-up failed.');
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
-
+  };
 
   return (
     <section className="auth-section">
-      <div className="container">
-        <h2>Sign up as {role}</h2>
-
-        <div className="social-auth-buttons">
-          <button className="social-button google-btn" 
-            type="button" 
-            onClick={handleGoogleLogin}
-          >
-            <img src="/src/assets/images/logos/google-logo.png" alt="Google Logo" className="social-logo" />
-            Continue with Google
-          </button>
-          <button className="social-button facebook-btn"
-            type="button" 
-            onClick={handleFacebookLogin}
-          >
-            <img src="/src/assets/images/logos/Facebook_logo.svg" alt="Facebook Logo" className="social-logo" />
-            Continue with Facebook
-          </button>
-        </div>
-
-        <div className="auth-divider">
-          <span>OR</span>
-        </div>
-
+      <div className="container auth-card">
+        <button className="auth-back" onClick={() => navigate('/auth/role-selection?action=signup')}>Back</button>
+        <p className="eyebrow">KAIROS ACCOUNT</p>
+        <h2>Create your {role} account</h2>
+        <p className="lead">Build your profile once, then use the workspace for your role.</p>
+        {error && <div className="auth-error">{error}</div>}
+        <button className="social-button google-btn" type="button" onClick={handleGoogle} disabled={loading}>Continue with Google</button>
+        <div className="auth-divider"><span>OR</span></div>
         <form className="auth-form" onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label htmlFor="name">Full Name</label>
-            <input 
-              type="text" 
-              id="name" 
-              placeholder="Enter your full name"
-              required
-              onChange={(e) => {
-                if (!validateName(e.target.value)) {
-                  setNameError('Name must be at least 2 characters');
-                } else {
-                  setNameError('');
-                }
-              }}
-            />
-            {nameError && <div className="validation-error">{nameError}</div>}
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="email">Email</label>
-            <input 
-              type="email" 
-              id="email" 
-              placeholder={`Enter your ${role} email`}
-              required
-              onChange={(e) => {
-                if (!validateEmail(e.target.value)) {
-                  setEmailError('Please enter a valid email');
-                } else {
-                  setEmailError('');
-                }
-              }}
-            />
-            {emailError && <div className="validation-error">{emailError}</div>}
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="password">Password</label>
-            <input 
-              type="password" 
-              id="password" 
-              placeholder="Create a password"
-              required
-              onChange={(e) => {
-                if (!validatePassword(e.target.value)) {
-                  setPasswordError('Password must be at least 8 characters');
-                } else {
-                  setPasswordError('');
-                }
-              }}
-            />
-            {passwordError && <div className="validation-error">{passwordError}</div>}
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="confirm-password">Confirm Password</label>
-            <input 
-              type="password" 
-              id="confirm-password" 
-              placeholder="Confirm your password"
-              required
-              onChange={(e) => {
-                if (e.target.value !== document.getElementById('password').value) {
-                  setConfirmPasswordError('Passwords do not match');
-                } else {
-                  setConfirmPasswordError('');
-                }
-              }}
-            />
-            {confirmPasswordError && <div className="validation-error">{confirmPasswordError}</div>}
-          </div>
-
-          <button type="submit" className="submit-btn">
-            Create Account
-          </button>
-
-          <p style={{ marginTop: '1rem', color: 'var(--light-text)' }}>
-            Already have an account?{' '}
-            <span 
-              style={{ color: 'var(--highlight-color)', cursor: 'pointer' }}
-              onClick={() => navigate(`/auth/login/${role}`)}
-            >
-              Login
-            </span>
-          </p>
+          <div className="form-group"><label htmlFor="name">Full name</label><input id="name" name="name" required placeholder="Lakshya Veer Singh" /></div>
+          <div className="form-group"><label htmlFor="email">Email</label><input id="email" name="email" type="email" required placeholder="you@example.com" /></div>
+          <div className="form-group"><label htmlFor="password">Password</label><input id="password" name="password" type="password" minLength="8" required placeholder="At least 8 characters" /></div>
+          <div className="form-group"><label htmlFor="confirmPassword">Confirm password</label><input id="confirmPassword" name="confirmPassword" type="password" minLength="8" required placeholder="Repeat your password" /></div>
+          <button className="submit-btn" type="submit" disabled={loading}>{loading ? 'Creating account…' : 'Create Account'}</button>
         </form>
+        <p className="auth-switch">Already have an account? <button onClick={() => navigate(`/auth/login/${role}`)}>Login</button></p>
       </div>
     </section>
-  )
+  );
 }
-
-export default Signup
