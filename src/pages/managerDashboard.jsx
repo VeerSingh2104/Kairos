@@ -34,7 +34,7 @@ export default function ManagerDashboard() {
       const items=snapshot.docs.map((item)=>({id:item.id,...item.data()}));
       setJobs(items);
       if(items.length){
-        const apps=await getDocs(query(collection(db,'applications'),where('jobId','in',items.slice(0,10).map((item)=>item.id)),limit(50)));
+        const apps=await getDocs(query(collection(db,'applications'),where('managerId','==',uid),limit(50)));
         setApplications(apps.docs.map((item)=>({id:item.id,...item.data()})));
       }
     }catch(err){console.warn(err);}
