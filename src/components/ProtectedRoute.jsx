@@ -27,6 +27,7 @@ export default function ProtectedRoute({ role, children }) {
   if (state.loading) return <div className="route-loading">Loading Kairos...</div>;
   if (!state.user || !state.profile) return <Navigate to={`/auth/login/${role}`} replace />;
   if (state.profile.role !== role) return <Navigate to={`/${state.profile.role}/dashboard`} replace />;
+  if (state.profile.status === 'suspended') return <div className="route-loading">This account has been suspended.</div>;
   if (!state.profile.profileComplete) return <Navigate to="/profile-setup" replace />;
 
   return children;
