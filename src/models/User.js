@@ -38,6 +38,7 @@ const User = {
     await setDoc(doc(usersCollection, uid), {
       uid,
       role,
+      status: 'active',
       profileComplete: false,
       profileData: profile,
       createdAt: serverTimestamp(),
