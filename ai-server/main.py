@@ -1,14 +1,12 @@
+import json
 import os
+
+import requests
 from fastapi import FastAPI
-
-app = FastAPI()
-MODEL = os.getenv("GEMINI_MODEL", "gemini-3.5-flash")
-
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
-import json
-import requests
 
+app = FastAPI(title="Kairos AI Service")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 MODEL = os.getenv("GEMINI_MODEL", "gemini-3.5-flash")
