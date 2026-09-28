@@ -56,6 +56,7 @@ function localAnalysis(text) {
   })).filter((group) => group.skills.length);
 
   return {
+    mode: 'local',
     score,
     career_field: field,
     summary: 'Your resume has been parsed successfully. The analysis below highlights detectable strengths, gaps and likely career directions.',
