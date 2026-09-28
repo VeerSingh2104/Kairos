@@ -55,7 +55,7 @@ export default function CandidateDashboard() {
     if (applications.some((item) => item.jobId === job.id)) { setMessage('You already applied to this role.'); return; }
     try {
       await addDoc(collection(db,'applications'), {
-        jobId: job.id, jobTitle: job.title, company: job.company || 'Kairos employer',
+        jobId: job.id, jobTitle: job.title, company: job.company || 'Kairos employer', managerId: job.managerId || '',
         candidateId: auth.currentUser.uid, candidateName: [record.profileData.firstName,record.profileData.lastName].filter(Boolean).join(' '),
         status:'Applied', createdAt:serverTimestamp()
       });
