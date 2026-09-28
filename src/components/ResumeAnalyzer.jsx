@@ -205,7 +205,7 @@ export default function ResumeAnalyzer({ onExtractedData }) {
         <div className="resume-results">
           <div className="resume-score-card">
             <div className="score-ring"><strong>{result.score}</strong><span>/100</span></div>
-            <div><p className="eyebrow">RESUME SCORE</p><h3>{scoreLabel}</h3><p>{result.summary}</p></div>
+            <div><p className="eyebrow">{result.mode === 'gemini' ? 'GEMINI AI ANALYSIS' : 'LOCAL RESUME ANALYSIS'}</p><h3>{scoreLabel}</h3><p>{result.summary}</p></div>
           </div>
 
           <div className="resume-result-grid">
