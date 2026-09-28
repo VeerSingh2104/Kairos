@@ -147,7 +147,8 @@ export default function ResumeAnalyzer({ onExtractedData }) {
       if (text.trim().length < 50) throw new Error('The file does not contain enough readable text. If this is a scanned PDF, use a text-based PDF or DOCX.');
       let analysis = localAnalysis(text);
       try {
-        const response = await fetch('/api/analyze-resume', {
+        const apiBase = import.meta.env.VITE_AI_API_URL || '';
+        const response = await fetch(apiBase + '/api/analyze-resume', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ text, file_name: selectedFile.name })
