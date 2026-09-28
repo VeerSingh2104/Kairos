@@ -145,11 +145,24 @@ export default function ResumeAnalyzer({ onExtractedData }) {
     try {
       const text = await extractText(selectedFile);
       if (text.trim().length < 50) throw new Error('The file does not contain enough readable text. If this is a scanned PDF, use a text-based PDF or DOCX.');
-      const local = localAnalysis(text);
-      setResult(local);
-      await saveAnalysis(local, selectedFile.name, text);
+      let analysis = localAnalysis(text);
+      try {
+        const response = await fetch('/api/analyze-resume', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text, file_name: selectedFile.name })
+        });
+        if (response.ok) {
+          const remote = await response.json();
+          if (remote.mode === 'gemini') analysis = remote;
+        }
+      } catch (apiError) {
+        console.info('AI service unavailable; using local resume analysis.', apiError);
+      }
+      setResult(analysis);
+      await saveAnalysis(analysis, selectedFile.name, text);
       await loadHistory();
-      if (onExtractedData) onExtractedData({ skills: local.skills });
+      if (onExtractedData) onExtractedData({ skills: analysis.skills || [] });
     } catch (err) {
       console.error(err);
       setError(err.message || 'Unable to analyze this resume.');
