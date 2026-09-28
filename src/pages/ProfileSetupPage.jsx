@@ -1,42 +1,60 @@
-import React from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import ProfileSetup from '../components/ProfileSetup';
-import User from '../models/User';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { auth } from '../firebase';
+import User from '../models/User';
+import ProfileSetup from '../components/ProfileSetup';
+import '../styles/components/components.css';
 
-const ProfileSetupPage = () => {
+export default function ProfileSetupPage() {
   const navigate = useNavigate();
+  const [record, setRecord] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
-  const handleComplete = async (profileData) => {
-    try {
-      const userId = auth.currentUser.uid;
-      console.log('Saving profile data for user:', userId, profileData);
-      await User.updateProfile(userId, profileData);
-      console.log('Profile data saved successfully');
-      await User.markProfileComplete(userId);
-      console.log('Profile marked as complete');
-
-      // Re-fetch user data to confirm profileComplete flag
-      const updatedUser = await User.getById(userId);
-      if (updatedUser && updatedUser.profileComplete) {
-        console.log('Confirmed profileComplete flag is set');
-        navigate(`/${profileData.role || 'candidate'}/dashboard`, { replace: true });
-      } else {
-        console.warn('ProfileComplete flag not set yet, retrying navigation');
-        // Optionally retry or show message
-        navigate(`/${profileData.role || 'candidate'}/dashboard`, { replace: true });
+  useEffect(() => {
+    return onAuthStateChanged(auth, async (user) => {
+      if (!user) {
+        navigate('/auth/role-selection?action=signup', { replace: true });
+        return;
       }
-    } catch (error) {
-      console.error('Error completing profile setup:', error);
-      // Optionally show error to user
+      try {
+        const data = await User.getById(user.uid);
+        if (!data) throw new Error('Your account profile could not be found.');
+        setRecord(data);
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    });
+  }, [navigate]);
+
+  const complete = async (profileData) => {
+    if (!auth.currentUser || !record) return;
+    setError('');
+    try {
+      await User.updateProfile(auth.currentUser.uid, profileData);
+      await User.markProfileComplete(auth.currentUser.uid, true);
+      navigate(`/${record.role}/dashboard`, { replace: true });
+    } catch (err) {
+      console.error(err);
+      setError('We could not save your profile. Check your connection and try again.');
     }
   };
 
+  const logout = async () => {
+    await signOut(auth);
+    navigate('/', { replace: true });
+  };
+
+  if (loading) return <div className="route-loading">Loading profile setup...</div>;
+  if (!record) return <div className="route-loading">{error || 'Profile unavailable.'}</div>;
+
   return (
-    <div>
-      <ProfileSetup onComplete={handleComplete} />
+    <div className="profile-page-shell">
+      {error && <div className="profile-save-error">{error}</div>}
+      <ProfileSetup autofillData={record.profileData} onComplete={complete} onLogout={logout} />
     </div>
   );
-};
-
-export default ProfileSetupPage;
+}
