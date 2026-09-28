@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import LandingPage from './pages/LandingPage';
 import RoleSelection from './pages/auth/RoleSelection';
 import Login from './pages/auth/Login';
@@ -8,6 +8,7 @@ import AdminDashboard from './pages/adminDashboard';
 import ManagerDashboard from './pages/managerDashboard';
 import CandidateDashboard from './pages/candidateDashboard';
 import ProfileSetupPage from './pages/ProfileSetupPage';
+import ProtectedRoute from './components/ProtectedRoute';
 import './styles/base.css';
 import './styles/components/auth.css';
 
@@ -22,9 +23,10 @@ function App() {
           <Route path="/auth/signup/:role" element={<Signup />} />
           <Route path="/auth/success" element={<SuccessPage />} />
           <Route path="/profile-setup" element={<ProfileSetupPage />} />
-          <Route path="/manager/dashboard" element={<ManagerDashboard />} />
-          <Route path="/candidate/dashboard" element={<CandidateDashboard />} />
-          <Route path="/admin/dashboard" element={<AdminDashboard />} />
+          <Route path="/candidate/dashboard" element={<ProtectedRoute role="candidate"><CandidateDashboard /></ProtectedRoute>} />
+          <Route path="/manager/dashboard" element={<ProtectedRoute role="manager"><ManagerDashboard /></ProtectedRoute>} />
+          <Route path="/admin/dashboard" element={<ProtectedRoute role="admin"><AdminDashboard /></ProtectedRoute>} />
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Router>
     </div>
