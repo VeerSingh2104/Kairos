@@ -1,167 +1,216 @@
-import React, { useState } from 'react';
-import { Document, Page, pdfjs } from 'react-pdf';
-import 'react-pdf/dist/esm/Page/AnnotationLayer.css';
+import { useMemo, useState } from 'react';
+import { pdfjs } from 'react-pdf';
 import mammoth from 'mammoth';
+import { FiAlertCircle, FiCheckCircle, FiFileText, FiLoader, FiUploadCloud } from 'react-icons/fi';
+import { getFirestore, collection, addDoc, query, where, orderBy, limit, getDocs, serverTimestamp } from 'firebase/firestore';
+import { firebaseApp, auth } from '../firebase';
 
-// Set workerSrc for pdfjs
-pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.js`;
+pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
 
-// Keyword lists for skill matching
-const dsKeywords = ['tensorflow', 'keras', 'pytorch', 'machine learning', 'deep learning', 'flask', 'streamlit'];
-const webKeywords = ['react', 'django', 'node js', 'react js', 'php', 'laravel', 'magento', 'wordpress', 'javascript', 'angular js', 'c#', 'flask'];
-const androidKeywords = ['android', 'android development', 'flutter', 'kotlin', 'xml', 'kivy'];
-const iosKeywords = ['ios', 'ios development', 'swift', 'cocoa', 'cocoa touch', 'xcode'];
-const uiuxKeywords = ['ux', 'adobe xd', 'figma', 'zeplin', 'balsamiq', 'ui', 'prototyping', 'wireframes', 'storyframes', 'adobe photoshop', 'photoshop', 'editing', 'adobe illustrator', 'illustrator', 'adobe after effects', 'after effects', 'adobe premier pro', 'premier pro', 'adobe indesign', 'indesign', 'wireframe', 'solid', 'grasp', 'user research', 'user experience'];
+const db = getFirestore(firebaseApp);
 
-function ResumeAnalyzer({ onExtractedData }) {
-  const [pdfFile, setPdfFile] = useState(null);
-  const [textContent, setTextContent] = useState('');
-  const [analysisResult, setAnalysisResult] = useState(null);
+const SKILLS = [
+  'react','next.js','javascript','typescript','html','css','tailwind','vite','node.js','node js',
+  'express','python','java','c++','django','flask','spring','mongodb','mysql','postgresql','sql',
+  'firebase','aws','azure','docker','kubernetes','git','github','figma','pytorch','tensorflow',
+  'scikit-learn','pandas','numpy','machine learning','deep learning','nlp','llm','rest api'
+];
 
-  // Extract text from PDF using pdfjs
-  const extractTextFromPDF = async (file) => {
-    const arrayBuffer = await file.arrayBuffer();
-    const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
-    let fullText = '';
-    for (let i = 1; i <= pdf.numPages; i++) {
-      const page = await pdf.getPage(i);
+const GROUPS = {
+  'Frontend': ['react','next.js','javascript','typescript','html','css','tailwind','vite'],
+  'Backend': ['node.js','node js','express','python','java','django','flask','spring','rest api'],
+  'Data & AI': ['python','pytorch','tensorflow','scikit-learn','pandas','numpy','machine learning','deep learning','nlp','llm'],
+  'Cloud & DevOps': ['aws','azure','docker','kubernetes','git','github'],
+  'Databases': ['mongodb','mysql','postgresql','sql','firebase'],
+  'Design': ['figma']
+};
+
+function localAnalysis(text) {
+  const lower = text.toLowerCase();
+  const skills = SKILLS.filter((skill) => lower.includes(skill));
+  const sections = {
+    experience: /experience|employment|internship/.test(lower),
+    education: /education|university|college|degree|b.tech|bachelor/.test(lower),
+    projects: /projects|portfolio|github/.test(lower),
+    skills: /skills|technologies|technical/.test(lower)
+  };
+  const sectionScore = Object.values(sections).filter(Boolean).length * 10;
+  const skillScore = Math.min(skills.length * 2, 20);
+  const lengthScore = Math.min(Math.round(text.length / 300), 15);
+  const score = Math.min(100, 35 + sectionScore + skillScore + lengthScore);
+  let field = 'Software Engineering';
+  if (/machine learning|deep learning|tensorflow|pytorch|nlp|llm/.test(lower)) field = 'AI / Machine Learning';
+  else if (/data analyst|data analysis|power bi|tableau/.test(lower)) field = 'Data & Analytics';
+  else if (/figma|ui\/ux|user research/.test(lower)) field = 'UI/UX & Product Design';
+
+  const improvements = [];
+  if (!sections.experience) improvements.push('Add internship, work, research, freelance, or leadership experience.');
+  if (!sections.projects) improvements.push('Add 2–3 projects with technologies, your contribution, and measurable outcomes.');
+  if (!sections.skills) improvements.push('Add a clearly grouped technical skills section.');
+  if (!/\d+%|\d+ users|\d+ ms|\d+ projects|\d+ years/.test(lower)) improvements.push('Quantify impact using metrics such as %, users, latency, scale, or time saved.');
+  if (!/github|linkedin|email|@/.test(lower)) improvements.push('Include professional contact or portfolio links.');
+
+  const groups = Object.entries(GROUPS).map(([name, items]) => ({
+    name,
+    skills: items.filter((skill) => lower.includes(skill))
+  })).filter((group) => group.skills.length);
+
+  return {
+    score,
+    career_field: field,
+    summary: 'Your resume has been parsed successfully. The analysis below highlights detectable strengths, gaps and likely career directions.',
+    skills,
+    strengths: [
+      skills.length ? 'Strong technical keyword coverage was detected.' : 'The resume text is readable and ready for analysis.',
+      sections.projects ? 'Projects are present and can support technical screening.' : 'The document can be improved with stronger project evidence.',
+      sections.education ? 'Education information is detectable.' : 'Education details should be made easier to locate.'
+    ],
+    improvements: improvements.slice(0, 5),
+    ats_keywords: skills.slice(0, 12),
+    missing_sections: Object.entries(sections).filter(([, present]) => !present).map(([name]) => name),
+    recommended_roles: [field, 'Software Engineer', 'Full Stack Developer'],
+    questions: [
+      'Walk through your strongest project and explain the engineering decisions you made.',
+      'Which technology on your resume are you most confident using independently?',
+      'Describe a difficult bug or problem you solved.'
+    ],
+    groups
+  };
+}
+
+async function extractText(file) {
+  if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
+    const buffer = await file.arrayBuffer();
+    const pdf = await pdfjs.getDocument({ data: buffer }).promise;
+    let text = '';
+    for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+      const page = await pdf.getPage(pageNumber);
       const content = await page.getTextContent();
-      const strings = content.items.map(item => item.str);
-      fullText += strings.join(' ') + ' ';
+      text += content.items.map((item) => item.str).join(' ') + '\n';
     }
-    return fullText;
-  };
-
-  // Extract text from DOCX using mammoth
-  const extractTextFromDocx = async (file) => {
-    const arrayBuffer = await file.arrayBuffer();
-    const result = await mammoth.extractRawText({ arrayBuffer });
+    return text;
+  }
+  if (file.name.toLowerCase().endsWith('.docx')) {
+    const buffer = await file.arrayBuffer();
+    const result = await mammoth.extractRawText({ arrayBuffer: buffer });
     return result.value;
-  };
+  }
+  throw new Error('Only PDF and DOCX files are supported.');
+}
 
-  const handleFileChange = async (event) => {
-    const file = event.target.files[0];
-    if (!file) return;
+async function saveAnalysis(result, fileName, text) {
+  if (!auth.currentUser) return;
+  await addDoc(collection(db, 'resumeAnalyses'), {
+    uid: auth.currentUser.uid,
+    fileName,
+    textLength: text.length,
+    result,
+    createdAt: serverTimestamp()
+  });
+}
 
-    if (file.type === 'application/pdf') {
-      setPdfFile(file);
-      const text = await extractTextFromPDF(file);
-      setTextContent(text);
-      analyzeResume(text);
-      if (onExtractedData) onExtractedData(parseKeywordsToFormData(text));
-    } else if (
-      file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
-      file.name.endsWith('.docx')
-    ) {
-      const text = await extractTextFromDocx(file);
-      setPdfFile(null);
-      setTextContent(text);
-      analyzeResume(text);
-      if (onExtractedData) onExtractedData(parseKeywordsToFormData(text));
-    } else {
-      alert('Please upload a PDF or DOCX file.');
+export default function ResumeAnalyzer({ onExtractedData }) {
+  const [file, setFile] = useState(null);
+  const [result, setResult] = useState(null);
+  const [history, setHistory] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const scoreLabel = useMemo(() => {
+    if (!result) return '';
+    if (result.score >= 80) return 'Strong';
+    if (result.score >= 65) return 'Good';
+    if (result.score >= 50) return 'Needs work';
+    return 'Early draft';
+  }, [result]);
+
+  const loadHistory = async () => {
+    if (!auth.currentUser) return;
+    try {
+      const snapshot = await getDocs(query(
+        collection(db, 'resumeAnalyses'),
+        where('uid', '==', auth.currentUser.uid),
+        orderBy('createdAt', 'desc'),
+        limit(5)
+      ));
+      setHistory(snapshot.docs.map((item) => ({ id: item.id, ...item.data() })));
+    } catch (err) {
+      console.warn('Resume history unavailable:', err);
     }
   };
 
-  // Analyze resume text for skills and recommendations
-  const analyzeResume = (text) => {
-    const lowerText = text.toLowerCase();
-    let recoField = '';
-    let recommendedSkills = [];
-    let recommendedCourses = [];
-
-    const checkKeywords = (keywords, field, skills, courses) => {
-      for (const kw of keywords) {
-        if (lowerText.includes(kw)) {
-          recoField = field;
-          recommendedSkills = skills;
-          recommendedCourses = courses;
-          return true;
-        }
-      }
-      return false;
-    };
-
-    // Example course lists (can be replaced with actual data or API)
-    const dsCourses = ['Machine Learning Crash Course by Google', 'Machine Learning A-Z by Udemy'];
-    const webCourses = ['React - The Complete Guide', 'Django for Beginners'];
-    const androidCourses = ['Android Development for Beginners', 'Flutter & Dart - The Complete Guide'];
-    const iosCourses = ['iOS App Development with Swift', 'Advanced iOS Development'];
-    const uiuxCourses = ['UI/UX Design Fundamentals', 'Advanced Prototyping Techniques'];
-
-    if (checkKeywords(dsKeywords, 'Data Science', ['Data Visualization', 'Predictive Analysis', 'Statistical Modeling', 'Data Mining'], dsCourses)) {
-      // matched Data Science
-    } else if (checkKeywords(webKeywords, 'Web Development', ['React', 'Django', 'Node JS', 'PHP'], webCourses)) {
-      // matched Web Development
-    } else if (checkKeywords(androidKeywords, 'Android Development', ['Android', 'Flutter', 'Kotlin'], androidCourses)) {
-      // matched Android
-    } else if (checkKeywords(iosKeywords, 'iOS Development', ['iOS', 'Swift', 'Xcode'], iosCourses)) {
-      // matched iOS
-    } else if (checkKeywords(uiuxKeywords, 'UI/UX Development', ['UI', 'User Experience', 'Adobe XD'], uiuxCourses)) {
-      // matched UI/UX
-    } else {
-      recoField = 'General';
-      recommendedSkills = ['Communication', 'Teamwork', 'Problem Solving'];
-      recommendedCourses = ['Effective Communication', 'Teamwork Skills'];
+  const analyze = async (selectedFile) => {
+    setLoading(true);
+    setError('');
+    try {
+      const text = await extractText(selectedFile);
+      if (text.trim().length < 50) throw new Error('The file does not contain enough readable text. If this is a scanned PDF, use a text-based PDF or DOCX.');
+      const local = localAnalysis(text);
+      setResult(local);
+      await saveAnalysis(local, selectedFile.name, text);
+      await loadHistory();
+      if (onExtractedData) onExtractedData({ skills: local.skills });
+    } catch (err) {
+      console.error(err);
+      setError(err.message || 'Unable to analyze this resume.');
+    } finally {
+      setLoading(false);
     }
-
-    // Simple scoring based on presence of keywords
-    let score = 0;
-    const keywordsAll = [...dsKeywords, ...webKeywords, ...androidKeywords, ...iosKeywords, ...uiuxKeywords];
-    keywordsAll.forEach(kw => {
-      if (lowerText.includes(kw)) score += 1;
-    });
-    if (score > 20) score = 20; // cap score
-
-    setAnalysisResult({
-      recoField,
-      recommendedSkills,
-      recommendedCourses,
-      score
-    });
   };
 
-  // Parse keywords from text to autofill form data structure
-  const parseKeywordsToFormData = (text) => {
-    const lowerText = text.toLowerCase();
-    const formData = {
-      firstName: '',
-      lastName: '',
-      email: '',
-      phone: '',
-      education: [{ institution: '', degree: '', year: '' }],
-      experience: [{ company: '', position: '', duration: '' }],
-      skills: []
-    };
-
-    // Simple heuristic: extract skills found in text
-    const allKeywords = [...dsKeywords, ...webKeywords, ...androidKeywords, ...iosKeywords, ...uiuxKeywords];
-    const foundSkills = allKeywords.filter(kw => lowerText.includes(kw));
-    formData.skills = foundSkills.length > 0 ? foundSkills : [''];
-
-    return formData;
+  const handleChange = async (event) => {
+    const selected = event.target.files?.[0];
+    if (!selected) return;
+    setFile(selected);
+    setResult(null);
+    await analyze(selected);
   };
 
   return (
-    <div className="resume-analyzer">
-      <h2>Resume Analyzer</h2>
-      <input type="file" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={handleFileChange} />
-      {pdfFile && (
+    <div className="resume-ai">
+      <div className="resume-ai-header">
         <div>
-          <p>Uploaded file: {pdfFile.name}</p>
+          <p className="eyebrow">AI RESUME REVIEW</p>
+          <h2>Turn your resume into a career plan.</h2>
+          <p>Upload a PDF or DOCX. Kairos extracts the content, scores the resume and surfaces actionable improvements.</p>
+        </div>
+        <div className="resume-ai-icon"><FiFileText /></div>
+      </div>
+
+      <label className="resume-dropzone">
+        <FiUploadCloud size={28} />
+        <strong>{loading ? 'Analyzing resume…' : 'Choose a PDF or DOCX'}</strong>
+        <span>{file ? file.name : 'Text-based resumes work best'}</span>
+        <input type="file" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={handleChange} disabled={loading} />
+      </label>
+
+      {loading && <div className="resume-status"><FiLoader className="spin" /> Extracting and analyzing your resume...</div>}
+      {error && <div className="resume-error"><FiAlertCircle />{error}</div>}
+
+      {result && (
+        <div className="resume-results">
+          <div className="resume-score-card">
+            <div className="score-ring"><strong>{result.score}</strong><span>/100</span></div>
+            <div><p className="eyebrow">RESUME SCORE</p><h3>{scoreLabel}</h3><p>{result.summary}</p></div>
+          </div>
+
+          <div className="resume-result-grid">
+            <section><p className="eyebrow">CAREER DIRECTION</p><h3>{result.career_field}</h3><div className="chip-list">{result.recommended_roles?.map((role) => <span key={role}>{role}</span>)}</div></section>
+            <section><p className="eyebrow">DETECTED SKILLS</p><div className="chip-list">{result.skills.map((skill) => <span key={skill}>{skill}</span>)}</div></section>
+            <section><p className="eyebrow">WHAT IS WORKING</p>{result.strengths.map((item) => <p className="result-line" key={item}><FiCheckCircle />{item}</p>)}</section>
+            <section><p className="eyebrow">NEXT IMPROVEMENTS</p>{result.improvements.map((item) => <p className="result-line" key={item}><FiAlertCircle />{item}</p>)}</section>
+          </div>
+
+          <section className="resume-section"><p className="eyebrow">INTERVIEW PREP</p>{result.questions.map((question) => <div className="question-row" key={question}>{question}</div>)}</section>
         </div>
       )}
-      {analysisResult && (
-        <div className="analysis-result">
-          <h3>Analysis Result</h3>
-          <p><strong>Recommended Field:</strong> {analysisResult.recoField}</p>
-          <p><strong>Recommended Skills:</strong> {analysisResult.recommendedSkills.join(', ')}</p>
-          <p><strong>Recommended Courses:</strong> {analysisResult.recommendedCourses.join(', ')}</p>
-          <p><strong>Resume Score:</strong> {analysisResult.score} / 20</p>
-        </div>
+
+      {history.length > 0 && (
+        <section className="resume-history">
+          <p className="eyebrow">RECENT ANALYSES</p>
+          {history.map((item) => <button key={item.id} onClick={() => setResult(item.result)}>{item.fileName}<span>{item.result?.score ?? '--'}/100</span></button>)}
+        </section>
       )}
     </div>
   );
 }
-
-export default ResumeAnalyzer;
