@@ -9,7 +9,6 @@ import ManagerDashboard from './pages/managerDashboard';
 import CandidateDashboard from './pages/candidateDashboard';
 import ProfileSetupPage from './pages/ProfileSetupPage';
 import ProtectedRoute from './components/ProtectedRoute';
-import './styles/base.css';
 import './styles/components/auth.css';
 
 function App() {
