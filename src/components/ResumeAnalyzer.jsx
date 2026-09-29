@@ -5,7 +5,7 @@ import { FiAlertCircle, FiCheckCircle, FiFileText, FiLoader, FiUploadCloud } fro
 import { getFirestore, collection, addDoc, query, where, orderBy, limit, getDocs, serverTimestamp } from 'firebase/firestore';
 import { firebaseApp, auth } from '../firebase';
 
-pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
+pdfjs.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url).toString();
 
 const db = getFirestore(firebaseApp);
 
