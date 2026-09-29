@@ -1,15 +1,18 @@
 import json
 import os
 
+from dotenv import load_dotenv
+load_dotenv()
+
 import requests
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 app = FastAPI(title="Kairos AI Service")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
-MODEL = os.getenv("GEMINI_MODEL", "gemini-3.5-flash")
+MODEL = os.getenv("GEMINI_MODEL", "gemini-3-flash-preview")
 URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 
 class AnalyzeRequest(BaseModel):
@@ -37,17 +40,27 @@ def analyze_resume(request: AnalyzeRequest):
         "contents": [{"role": "user", "parts": [{"text": prompt}]}],
         "generationConfig": {"temperature": 0.2, "responseMimeType": "application/json"}
     }
-    response = requests.post(
-        URL.format(model=MODEL),
-        headers={"Content-Type": "application/json", "x-goog-api-key": key},
-        json=payload,
-        timeout=60
-    )
-    response.raise_for_status()
-    data = response.json()
-    parts = data.get("candidates", [{}])[0].get("content", {}).get("parts", [])
-    output = "".join(part.get("text", "") for part in parts).strip()
-    result = json.loads(output)
+
+    try:
+        response = requests.post(
+            URL.format(model=MODEL),
+            headers={"Content-Type": "application/json", "x-goog-api-key": key},
+            json=payload,
+            timeout=60
+        )
+        response.raise_for_status()
+        data = response.json()
+        parts = data.get("candidates", [{}])[0].get("content", {}).get("parts", [])
+        output = "".join(part.get("text", "") for part in parts).strip()
+        if not output:
+            raise ValueError("Gemini returned an empty response.")
+        result = json.loads(output)
+    except requests.HTTPError as exc:
+        detail = exc.response.text[:1200] if exc.response is not None else str(exc)
+        raise HTTPException(status_code=502, detail=f"Gemini API error: {detail}") from exc
+    except (requests.RequestException, json.JSONDecodeError, ValueError) as exc:
+        raise HTTPException(status_code=502, detail=f"Gemini analysis failed: {exc}") from exc
+
     result["mode"] = "gemini"
     result["file_name"] = request.file_name
     return result
