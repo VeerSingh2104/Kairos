@@ -157,13 +157,22 @@ export default function ResumeAnalyzer({ onExtractedData }) {
         if (response.ok) {
           const remote = await response.json();
           if (remote.mode === 'gemini') analysis = remote;
+        } else {
+          const remoteError = await response.json().catch(() => ({}));
+          console.error('Gemini API error:', remoteError);
+          setError(`Gemini analysis failed: ${remoteError.detail || `HTTP ${response.status}`}. Showing local analysis instead.`);
         }
       } catch (apiError) {
         console.info('AI service unavailable; using local resume analysis.', apiError);
+        setError('Gemini AI service could not be reached. Showing local analysis instead.');
       }
       setResult(analysis);
-      await saveAnalysis(analysis, selectedFile.name, text);
-      await loadHistory();
+      try {
+        await saveAnalysis(analysis, selectedFile.name, text);
+        await loadHistory();
+      } catch (saveError) {
+        console.error('Could not save resume analysis:', saveError);
+      }
       if (onExtractedData) onExtractedData({ skills: analysis.skills || [] });
     } catch (err) {
       console.error(err);
@@ -205,7 +214,7 @@ export default function ResumeAnalyzer({ onExtractedData }) {
       {result && (
         <div className="resume-results">
           <div className="resume-score-card">
-            <div className="score-ring"><strong>{result.score}</strong><span>/100</span></div>
+            <div className="score-ring" style={{ '--score': `${Math.max(0, Math.min(100, Number(result.score) || 0))}%` }}><strong>{result.score}</strong><span>/100</span></div>
             <div><p className="eyebrow">{result.mode === 'gemini' ? 'GEMINI AI ANALYSIS' : 'LOCAL RESUME ANALYSIS'}</p><h3>{scoreLabel}</h3><p>{result.summary}</p></div>
           </div>
 
