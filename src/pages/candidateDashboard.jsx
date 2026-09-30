@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { FiBell, FiBriefcase, FiFileText, FiHome, FiLogOut, FiSettings, FiTarget, FiUsers, FiMapPin, FiSend } from 'react-icons/fi';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
-import { getFirestore, collection, doc, getDocs, addDoc, query, where, orderBy, limit, serverTimestamp, updateDoc } from 'firebase/firestore';
+import { getFirestore, collection, doc, getDocs, addDoc, query, where, limit, serverTimestamp, updateDoc } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
 import { auth, firebaseApp } from '../firebase';
 import User from '../models/User';
@@ -72,8 +72,14 @@ export default function CandidateDashboard() {
 
   const loadJobs = async () => {
     try {
-      const snapshot = await getDocs(query(collection(db,'jobs'), orderBy('createdAt','desc'), limit(30)));
-      setJobs(snapshot.docs.map((item) => ({id:item.id,...item.data()})));
+      const snapshot = await getDocs(query(collection(db,'jobs'), limit(30)));
+      const items = snapshot.docs.map((item) => ({id:item.id,...item.data()}));
+      items.sort((a,b) => {
+        const aTime = a.createdAt?.seconds || 0;
+        const bTime = b.createdAt?.seconds || 0;
+        return bTime - aTime;
+      });
+      setJobs(items);
     } catch (err) { console.warn('Jobs unavailable',err); }
   };
 
