@@ -105,3 +105,10 @@
 .result-meta{margin:8px 0 0!important;color:#817b8d!important;font-size:10px!important}.result-meta strong{color:#d2ced9}
 .course-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:12px}.course-card{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 12px;border:1px solid rgba(255,255,255,.07);border-radius:9px;background:rgba(255,255,255,.018);color:#aaa5b5;text-decoration:none;font-size:10px}.course-card:hover{border-color:rgba(139,126,255,.35);color:#ddd8e8}.course-card svg{flex:0 0 auto;color:#8879ef}
 @media(max-width:700px){.course-grid{grid-template-columns:1fr}}
+
+.section-subtitle{margin:5px 0 0!important;color:#777283!important;font-size:10px!important;max-width:620px}
+.job-main{min-width:0;flex:1}.job-title-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.job-title-row h3{margin:0}
+.match-badge{padding:5px 8px;border-radius:999px;background:rgba(121,105,233,.12);border:1px solid rgba(121,105,233,.2);color:#a89cff;font-size:9px;font-weight:700}
+.matched-chip{background:rgba(92,205,151,.09)!important;border-color:rgba(92,205,151,.18)!important;color:#8cdbaf!important}
+.match-reason{margin:10px 0 0!important;color:#858092!important;font-size:9px!important}
+@media(max-width:700px){.job-title-row{align-items:flex-start;flex-direction:column;gap:6px}}
