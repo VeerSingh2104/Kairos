@@ -8,7 +8,6 @@ import { firebaseApp, auth } from '../firebase';
 pdfjs.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url).toString();
 
 const db = getFirestore(firebaseApp);
-const SKILLS = ['react','next.js','javascript','typescript','html','css','tailwind','vite','node.js','node js','express','python','java','c++','django','flask','spring','mongodb','mysql','postgresql','sql','firebase','aws','azure','docker','kubernetes','git','github','figma','pytorch','tensorflow','scikit-learn','pandas','numpy','machine learning','deep learning','nlp','llm','rest api'];
 
 async function extractText(file) {
   if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
