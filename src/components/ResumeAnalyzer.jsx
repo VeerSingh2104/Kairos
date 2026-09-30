@@ -128,7 +128,7 @@ export default function ResumeAnalyzer({ onExtractedData }) {
       } catch (saveError) {
         console.error('Could not save resume analysis:', saveError);
       }
-      if (onExtractedData) onExtractedData({ skills: analysis.skills || [] });
+      if (onExtractedData) onExtractedData(analysis);
     } catch (err) {
       console.error(err);
       setError(err.message || 'Unable to analyze this resume.');
