@@ -1,6 +1,6 @@
 import { useNavigate, useParams } from 'react-router-dom';
-import { useState } from 'react';
-import { signInWithEmailAndPassword, signInWithPopup } from 'firebase/auth';
+import { useEffect, useState } from 'react';
+import { getRedirectResult, signInWithEmailAndPassword, signInWithRedirect } from 'firebase/auth';
 import { auth, googleProvider } from '../../firebase';
 import User from '../../models/User';
 import '../../styles/components/auth.css';
@@ -24,6 +24,32 @@ export default function Login() {
     }
     navigate(record.profileComplete ? `/${role}/dashboard` : '/profile-setup', { replace: true });
   };
+
+  useEffect(() => {
+    let active = true;
+    const handleRedirect = async () => {
+      try {
+        const result = await getRedirectResult(auth);
+        if (result?.user && active) {
+          setLoading(true);
+          await redirect(result.user);
+        }
+      } catch (err) {
+        if (!active) return;
+        const messages = {
+          'auth/popup-closed-by-user': 'Google sign-in was cancelled. Try again.',
+          'auth/cancelled-popup-request': 'Google sign-in was cancelled. Try again.',
+          'auth/account-exists-with-different-credential': 'An account already exists with this email using another sign-in method.',
+          'auth/unauthorized-domain': 'This site is not authorized for Google sign-in in Firebase.'
+        };
+        setError(messages[err.code] || err.message || 'Google login failed.');
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+    handleRedirect();
+    return () => { active = false; };
+  }, []);
 
   const submit = async (event) => {
     event.preventDefault();
@@ -50,12 +76,10 @@ export default function Login() {
     setLoading(true);
     setError('');
     try {
-      const credential = await signInWithPopup(auth, googleProvider);
-      await redirect(credential.user);
+      await signInWithRedirect(auth, googleProvider);
     } catch (err) {
-      setError(err.message || 'Google login failed.');
-    } finally {
       setLoading(false);
+      setError(err.message || 'Unable to start Google login.');
     }
   };
 
