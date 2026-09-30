@@ -155,7 +155,7 @@ def normalize_ai_result(result: dict[str, Any], file_name: str, provider: str) -
 
     def arr(key):
         value = result.get(key)
-        return value if isinstance(value, list) else []
+        return [str(item) for item in value if item is not None] if isinstance(value, list) else []
 
     courses = [
         {"title": str(item.get("title", "")), "url": str(item.get("url", ""))}
@@ -240,14 +240,25 @@ def call_local_model(prompt: str) -> dict[str, Any]:
 
 @app.get("/api/providers")
 def providers():
-    local_available = False
+    local_server_available = False
+    local_model_available = False
     try:
-        local_available = requests.get(f"{OLLAMA_BASE_URL}/api/tags", timeout=3).ok
-    except requests.RequestException:
+        response = requests.get(f"{OLLAMA_BASE_URL}/api/tags", timeout=3)
+        local_server_available = response.ok
+        if response.ok:
+            models = response.json().get("models", [])
+            names = [str(item.get("name", "")) for item in models if isinstance(item, dict)]
+            local_model_available = OLLAMA_MODEL in names or any(name.startswith(OLLAMA_MODEL + ":") for name in names)
+    except (requests.RequestException, ValueError):
         pass
+
     return {
         "gemini": {"configured": bool(os.getenv("GEMINI_API_KEY")), "model": MODEL},
-        "local": {"available": local_available, "model": OLLAMA_MODEL},
+        "local": {
+            "available": local_model_available,
+            "server_available": local_server_available,
+            "model": OLLAMA_MODEL,
+        },
     }
 
 
