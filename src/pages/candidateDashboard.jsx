@@ -11,7 +11,7 @@ import '../styles/components/dashboard.css';
 const db = getFirestore(firebaseApp);
 const nav = [['overview','Overview',FiHome],['resume','Resume AI',FiFileText],['jobs','Jobs',FiBriefcase],['mentors','Mentors',FiUsers],['applications','Applications',FiTarget]];
 
-const normalize = (value = '') => value.toLowerCase().replace(/[.\/_-]/g, ' ').replace(/\\s+/g, ' ').trim();
+const normalize = (value = '') => value.toLowerCase().replace(/[.\/_-]/g, ' ').replace(/\s+/g, ' ').trim();
 
 function scoreJob(job, resume) {
   if (!resume) return { score: 0, matchedSkills: [], reasons: [] };
@@ -57,6 +57,7 @@ export default function CandidateDashboard() {
   const [jobs,setJobs] = useState([]);
   const [applications,setApplications] = useState([]);
   const [mentors,setMentors] = useState([]);
+  const [resumeInsights,setResumeInsights] = useState(null);
   const [message,setMessage] = useState('');
 
   useEffect(() => onAuthStateChanged(auth, async (user) => {
