@@ -1,6 +1,11 @@
 import { useNavigate, useParams } from 'react-router-dom';
-import { useEffect, useState } from 'react';
-import { browserLocalPersistence, getRedirectResult, onAuthStateChanged, setPersistence, signInWithEmailAndPassword, signInWithRedirect } from 'firebase/auth';
+import { useState } from 'react';
+import {
+  browserLocalPersistence,
+  setPersistence,
+  signInWithEmailAndPassword,
+  signInWithPopup,
+} from 'firebase/auth';
 import { auth, googleProvider } from '../../firebase';
 import User from '../../models/User';
 import '../../styles/components/auth.css';
@@ -11,74 +16,48 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const redirect = async (user) => {
+  const finishLogin = async (user) => {
     const record = await User.getById(user.uid);
+
     if (!record) {
-      await User.create(user.uid, { role, email: user.email || '', name: user.displayName || '' });
+      await User.create(user.uid, {
+        role,
+        email: user.email || '',
+        name: user.displayName || '',
+      });
       navigate('/profile-setup', { replace: true });
       return;
     }
+
     if (record.role !== role) {
       await auth.signOut();
       throw new Error(`This account belongs to the ${record.role} role.`);
     }
+
     navigate(record.profileComplete ? `/${role}/dashboard` : '/profile-setup', { replace: true });
   };
-
-  useEffect(() => {
-    let active = true;
-    const finishRedirect = async () => {
-      try {
-        await setPersistence(auth, browserLocalPersistence);
-        const result = await getRedirectResult(auth);
-        if (result?.user && active) {
-          setLoading(true);
-          await redirect(result.user);
-        }
-      } catch (err) {
-        if (!active) return;
-        const messages = {
-          'auth/account-exists-with-different-credential': 'An account already exists with this email using another sign-in method.',
-          'auth/unauthorized-domain': 'This site is not authorized for Google sign-in in Firebase.',
-          'auth/operation-not-supported-in-this-environment': 'Google redirect sign-in is not supported in this browser environment.'
-        };
-        setError(messages[err.code] || err.message || 'Google login failed.');
-      } finally {
-        if (active) setLoading(false);
-      }
-    };
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (!active || !user) return;
-      try {
-        const result = await getRedirectResult(auth);
-        if (result?.user || user) {
-          setLoading(true);
-          await redirect(user);
-        }
-      } catch (err) {
-        if (active) setError(err.message || 'Unable to complete Google login.');
-      } finally {
-        if (active) setLoading(false);
-      }
-    });
-    finishRedirect();
-    return () => { active = false; unsubscribe(); };
-  }, []);
 
   const submit = async (event) => {
     event.preventDefault();
     setLoading(true);
     setError('');
+
     const form = new FormData(event.currentTarget);
+
     try {
-      const credential = await signInWithEmailAndPassword(auth, String(form.get('email')).trim(), String(form.get('password')));
-      await redirect(credential.user);
+      await setPersistence(auth, browserLocalPersistence);
+      const credential = await signInWithEmailAndPassword(
+        auth,
+        String(form.get('email')).trim(),
+        String(form.get('password'))
+      );
+      await finishLogin(credential.user);
     } catch (err) {
       const messages = {
         'auth/invalid-credential': 'Email or password is incorrect.',
         'auth/user-not-found': 'No account was found with this email.',
         'auth/wrong-password': 'Email or password is incorrect.',
-        'auth/too-many-requests': 'Too many attempts. Try again later.'
+        'auth/too-many-requests': 'Too many attempts. Try again later.',
       };
       setError(messages[err.code] || err.message || 'Unable to log in.');
     } finally {
@@ -89,12 +68,22 @@ export default function Login() {
   const google = async () => {
     setLoading(true);
     setError('');
+
     try {
       await setPersistence(auth, browserLocalPersistence);
-      await signInWithRedirect(auth, googleProvider);
+      const credential = await signInWithPopup(auth, googleProvider);
+      await finishLogin(credential.user);
     } catch (err) {
+      const messages = {
+        'auth/popup-closed-by-user': 'The Google sign-in window was closed before login finished.',
+        'auth/popup-blocked': 'Your browser blocked the Google sign-in popup. Allow popups for this site and try again.',
+        'auth/account-exists-with-different-credential': 'An account already exists with this email using another sign-in method.',
+        'auth/unauthorized-domain': 'This site is not authorized for Google sign-in in Firebase.',
+        'auth/cancelled-popup-request': 'Another Google sign-in window is already open.',
+      };
+      setError(messages[err.code] || err.message || 'Google login failed.');
+    } finally {
       setLoading(false);
-      setError(err.message || 'Unable to start Google login.');
     }
   };
 
@@ -106,7 +95,9 @@ export default function Login() {
         <h2>Welcome back</h2>
         <p className="lead">Continue as a {role}.</p>
         {error && <div className="auth-error">{error}</div>}
-        <button className="social-button google-btn" type="button" onClick={google} disabled={loading}>Continue with Google</button>
+        <button className="social-button google-btn" type="button" onClick={google} disabled={loading}>
+          {loading ? 'Signing in…' : 'Continue with Google'}
+        </button>
         <div className="auth-divider"><span>OR</span></div>
         <form className="auth-form" onSubmit={submit}>
           <div className="form-group"><label htmlFor="email">Email</label><input id="email" name="email" type="email" required placeholder="you@example.com" /></div>
