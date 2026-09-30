@@ -121,15 +121,19 @@ def verify_user(authorization: str | None = Header(default=None)):
     try:
         import firebase_admin
         from firebase_admin import auth as firebase_auth
+        from firebase_admin import credentials
     except ImportError as exc:
         raise HTTPException(status_code=503, detail="Firebase Admin authentication is not installed.") from exc
 
     try:
         if not firebase_admin._apps:
             raw = os.getenv("FIREBASE_SERVICE_ACCOUNT_JSON", "").strip()
+            credential_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS", "").strip()
+
             if raw:
-                from firebase_admin import credentials
                 firebase_admin.initialize_app(credentials.Certificate(json.loads(raw)))
+            elif credential_path:
+                firebase_admin.initialize_app(credentials.Certificate(credential_path))
             else:
                 firebase_admin.initialize_app()
         if not authorization or not authorization.lower().startswith("bearer "):
