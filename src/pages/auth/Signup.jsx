@@ -28,8 +28,9 @@ export default function Signup() {
 
   useEffect(() => {
     let active = true;
-    const handleRedirect = async () => {
+    const finishRedirect = async () => {
       try {
+        await setPersistence(auth, browserLocalPersistence);
         const result = await getRedirectResult(auth);
         if (result?.user && active) {
           setLoading(true);
@@ -38,18 +39,31 @@ export default function Signup() {
       } catch (err) {
         if (!active) return;
         const messages = {
-          'auth/popup-closed-by-user': 'Google sign-up was cancelled. Try again.',
-          'auth/cancelled-popup-request': 'Google sign-up was cancelled. Try again.',
           'auth/account-exists-with-different-credential': 'An account already exists with this email using another sign-in method.',
-          'auth/unauthorized-domain': 'This site is not authorized for Google sign-in in Firebase.'
+          'auth/unauthorized-domain': 'This site is not authorized for Google sign-in in Firebase.',
+          'auth/operation-not-supported-in-this-environment': 'Google redirect sign-in is not supported in this browser environment.'
         };
         setError(messages[err.code] || err.message || 'Google sign-up failed.');
       } finally {
         if (active) setLoading(false);
       }
     };
-    handleRedirect();
-    return () => { active = false; };
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (!active || !user) return;
+      try {
+        const result = await getRedirectResult(auth);
+        if (result?.user || user) {
+          setLoading(true);
+          await finish(user, user.displayName || '');
+        }
+      } catch (err) {
+        if (active) setError(err.message || 'Unable to complete Google sign-up.');
+      } finally {
+        if (active) setLoading(false);
+      }
+    });
+    finishRedirect();
+    return () => { active = false; unsubscribe(); };
   }, []);
 
   const handleSubmit = async (event) => {
@@ -86,6 +100,7 @@ export default function Signup() {
     setLoading(true);
     setError('');
     try {
+      await setPersistence(auth, browserLocalPersistence);
       await signInWithRedirect(auth, googleProvider);
     } catch (err) {
       setLoading(false);
