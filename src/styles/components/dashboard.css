@@ -112,3 +112,17 @@
 .matched-chip{background:rgba(92,205,151,.09)!important;border-color:rgba(92,205,151,.18)!important;color:#8cdbaf!important}
 .match-reason{margin:10px 0 0!important;color:#858092!important;font-size:9px!important}
 @media(max-width:700px){.job-title-row{align-items:flex-start;flex-direction:column;gap:6px}}
+
+.ai-provider-picker{margin:18px 0 12px;padding:16px;border:1px solid rgba(255,255,255,.065);border-radius:14px;background:#0d0d15}
+.provider-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}.provider-heading h3{margin:0;font:700 15px var(--font-heading);text-shadow:none}.provider-checking{display:flex;align-items:center;gap:6px;color:#777283;font-size:9px}
+.provider-options{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:13px}
+.provider-option{min-width:0;display:flex;align-items:center;gap:10px;text-align:left;padding:12px;border:1px solid rgba(255,255,255,.07);border-radius:11px;background:rgba(255,255,255,.018);color:#aaa5b5;cursor:pointer}
+.provider-option:hover:not(:disabled){border-color:rgba(139,126,255,.35);background:rgba(121,105,233,.045)}
+.provider-option.active{border-color:rgba(139,126,255,.55);background:rgba(121,105,233,.075);box-shadow:0 0 0 1px rgba(139,126,255,.08) inset}
+.provider-option:disabled{opacity:.48;cursor:not-allowed}
+.provider-icon{width:31px;height:31px;display:grid;place-items:center;flex:0 0 31px;border-radius:8px;background:rgba(121,105,233,.1);color:#9b8ff2}
+.provider-option strong{display:block;color:#ddd8e8;font-size:11px}.provider-option small{display:block;margin-top:3px;color:#706b7a;font-size:8px;line-height:1.35}
+.provider-radio{margin-left:auto;width:18px;height:18px;display:grid;place-items:center;border:1px solid rgba(255,255,255,.14);border-radius:50%;color:#b3a8ff;font-size:10px}
+.provider-option.active .provider-radio{border-color:#8b7cf0;background:rgba(121,105,233,.14)}
+.provider-note{margin:10px 0 0!important;color:#716c7c!important;font-size:9px!important;line-height:1.5}
+@media(max-width:700px){.provider-options{grid-template-columns:1fr}.provider-heading{flex-direction:column}}
