@@ -185,6 +185,7 @@ export default function ResumeAnalyzer({ onExtractedData }) {
           </div>
 
           {(result.recommended_courses || []).length > 0 && <section className="resume-section"><p className="eyebrow"><FiBookOpen /> LEARNING RECOMMENDATIONS</p><div className="course-grid">{result.recommended_courses.slice(0,5).map((course) => <a className="course-card" href={course.url} target="_blank" rel="noreferrer" key={course.title}><span>{course.title}</span><FiExternalLink /></a>)}</div></section>}
+          {(result.resume_videos || []).length > 0 && <section className="resume-section"><p className="eyebrow">RESUME & INTERVIEW VIDEOS</p><div className="course-grid">{result.resume_videos.slice(0,3).map((url, index) => <a className="course-card" href={url} target="_blank" rel="noreferrer" key={url}><span>Resume preparation video {index + 1}</span><FiExternalLink /></a>)}{(result.interview_videos || []).slice(0,2).map((url, index) => <a className="course-card" href={url} target="_blank" rel="noreferrer" key={url}><span>Interview preparation video {index + 1}</span><FiExternalLink /></a>)}</div></section>}
 
           {(result.resume_tips || []).length > 0 && <section className="resume-section"><p className="eyebrow">SMART RESUME TIPS</p>{result.resume_tips.map((tip) => <p className="result-line" key={tip}><FiCheckCircle />{tip}</p>)}</section>}
 
