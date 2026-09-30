@@ -1,6 +1,6 @@
 import { useNavigate, useParams } from 'react-router-dom';
-import { useState } from 'react';
-import { createUserWithEmailAndPassword, signInWithPopup, updateProfile } from 'firebase/auth';
+import { useEffect, useState } from 'react';
+import { createUserWithEmailAndPassword, getRedirectResult, signInWithRedirect, updateProfile } from 'firebase/auth';
 import { auth, googleProvider } from '../../firebase';
 import User from '../../models/User';
 import '../../styles/components/auth.css';
@@ -25,6 +25,32 @@ export default function Signup() {
     }
     navigate('/profile-setup', { replace: true });
   };
+
+  useEffect(() => {
+    let active = true;
+    const handleRedirect = async () => {
+      try {
+        const result = await getRedirectResult(auth);
+        if (result?.user && active) {
+          setLoading(true);
+          await finish(result.user, result.user.displayName || '');
+        }
+      } catch (err) {
+        if (!active) return;
+        const messages = {
+          'auth/popup-closed-by-user': 'Google sign-up was cancelled. Try again.',
+          'auth/cancelled-popup-request': 'Google sign-up was cancelled. Try again.',
+          'auth/account-exists-with-different-credential': 'An account already exists with this email using another sign-in method.',
+          'auth/unauthorized-domain': 'This site is not authorized for Google sign-in in Firebase.'
+        };
+        setError(messages[err.code] || err.message || 'Google sign-up failed.');
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+    handleRedirect();
+    return () => { active = false; };
+  }, []);
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -60,12 +86,10 @@ export default function Signup() {
     setLoading(true);
     setError('');
     try {
-      const credential = await signInWithPopup(auth, googleProvider);
-      await finish(credential.user, credential.user.displayName || '');
+      await signInWithRedirect(auth, googleProvider);
     } catch (err) {
-      setError(err.message || 'Google sign-up failed.');
-    } finally {
       setLoading(false);
+      setError(err.message || 'Unable to start Google sign-up.');
     }
   };
 
