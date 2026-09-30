@@ -308,21 +308,6 @@ def legacy_analysis(text: str, page_count: int | None) -> dict[str, Any]:
         "interview_videos": INTERVIEW_VIDEOS,
     }
 
-def fallback_result(legacy: dict[str, Any], file_name: str, reason: str) -> dict[str, Any]:
-    return {
-        **legacy,
-        "mode": "legacy",
-        "file_name": file_name,
-        "score": legacy["legacy_score"],
-        "summary": reason,
-        "skills": legacy["legacy_detected_keywords"],
-        "strengths": ["Legacy resume structure checks completed.", "Career direction was inferred from detected technical keywords."],
-        "improvements": legacy["resume_tips"],
-        "ats_keywords": legacy["legacy_detected_keywords"],
-        "recommended_roles": [legacy["career_field"], "Software Engineer", "Full Stack Developer"],
-        "questions": ["Walk through your strongest project.", "Which technology on your resume are you most confident using?", "Describe a difficult problem you solved."],
-    }
-
 @app.post("/api/analyze-resume")
 def analyze_resume(request: AnalyzeRequest, _: dict[str, Any] | None = Depends(verify_user)):
     text = request.text.strip()
