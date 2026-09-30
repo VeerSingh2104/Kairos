@@ -1,7 +1,7 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { pdfjs } from 'react-pdf';
 import mammoth from 'mammoth';
-import { FiAlertCircle, FiCheckCircle, FiFileText, FiLoader, FiUploadCloud, FiBookOpen, FiExternalLink } from 'react-icons/fi';
+import { FiAlertCircle, FiCheckCircle, FiFileText, FiLoader, FiUploadCloud, FiBookOpen, FiExternalLink, FiCpu, FiCloud } from 'react-icons/fi';
 import { getFirestore, collection, addDoc, query, where, limit, getDocs, serverTimestamp } from 'firebase/firestore';
 import { firebaseApp, auth } from '../firebase';
 
@@ -9,37 +9,6 @@ pdfjs.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.min.m
 
 const db = getFirestore(firebaseApp);
 const SKILLS = ['react','next.js','javascript','typescript','html','css','tailwind','vite','node.js','node js','express','python','java','c++','django','flask','spring','mongodb','mysql','postgresql','sql','firebase','aws','azure','docker','kubernetes','git','github','figma','pytorch','tensorflow','scikit-learn','pandas','numpy','machine learning','deep learning','nlp','llm','rest api'];
-
-function localAnalysis(text) {
-  const lower = text.toLowerCase();
-  const skills = SKILLS.filter((skill) => lower.includes(skill));
-  const sections = {
-    experience: /experience|employment|internship/.test(lower),
-    education: /education|university|college|degree|b.tech|bachelor/.test(lower),
-    projects: /projects|portfolio|github/.test(lower),
-    skills: /skills|technologies|technical/.test(lower)
-  };
-  const score = Math.min(100, 35 + Object.values(sections).filter(Boolean).length * 10 + Math.min(skills.length * 2, 20) + Math.min(Math.round(text.length / 300), 15));
-  const improvements = [];
-  if (!sections.experience) improvements.push('Add internship, work, research, freelance, or leadership experience.');
-  if (!sections.projects) improvements.push('Add 2–3 projects with technologies, your contribution, and measurable outcomes.');
-  if (!sections.skills) improvements.push('Add a clearly grouped technical skills section.');
-  if (!/\d+%|\d+ users|\d+ ms|\d+ projects|\d+ years/.test(lower)) improvements.push('Quantify impact using metrics such as %, users, latency, scale, or time saved.');
-  let field = 'Software Engineering';
-  if (/machine learning|deep learning|tensorflow|pytorch|nlp|llm/.test(lower)) field = 'AI / Machine Learning';
-  else if (/data analyst|data analysis|power bi|tableau/.test(lower)) field = 'Data & Analytics';
-  else if (/figma|ui\/ux|user research/.test(lower)) field = 'UI/UX & Product Design';
-  return {
-    mode: 'local', score, career_field: field,
-    summary: 'The resume was parsed locally. Uploading to the Kairos AI service enables the hybrid analyzer.',
-    skills, strengths: [skills.length ? 'Technical keywords were detected.' : 'The resume text is readable.', sections.projects ? 'Projects are present.' : 'Projects should be made easier to locate.', sections.education ? 'Education information is detectable.' : 'Education details should be made easier to locate.'],
-    improvements: improvements.slice(0, 5), ats_keywords: skills.slice(0, 12),
-    missing_sections: Object.entries(sections).filter(([, present]) => !present).map(([name]) => name),
-    recommended_roles: [field, 'Software Engineer', 'Full Stack Developer'],
-    questions: ['Walk through your strongest project and explain the engineering decisions you made.', 'Which technology on your resume are you most confident using independently?', 'Describe a difficult bug or problem you solved.'],
-    recommended_skills: [], recommended_courses: [], resume_tips: []
-  };
-}
 
 async function extractText(file) {
   if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
@@ -61,9 +30,9 @@ async function extractText(file) {
   throw new Error('Only PDF and DOCX files are supported.');
 }
 
-async function saveAnalysis(result, fileName, text) {
+async function saveAnalysis(result, fileName, text, provider) {
   if (!auth.currentUser) return;
-  await addDoc(collection(db, 'resumeAnalyses'), { uid: auth.currentUser.uid, fileName, textLength: text.length, result, createdAt: serverTimestamp() });
+  await addDoc(collection(db, 'resumeAnalyses'), { uid: auth.currentUser.uid, fileName, provider, textLength: text.length, result, createdAt: serverTimestamp() });
 }
 
 export default function ResumeAnalyzer({ onExtractedData }) {
@@ -72,6 +41,34 @@ export default function ResumeAnalyzer({ onExtractedData }) {
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [provider, setProvider] = useState(() => localStorage.getItem('kairos-ai-provider') || 'gemini');
+  const [providers, setProviders] = useState({ gemini: { configured: false }, local: { available: false } });
+  const [providerLoading, setProviderLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadProviders = async () => {
+      setProviderLoading(true);
+      try {
+        const apiBase = (import.meta.env.VITE_AI_API_URL || '').replace(/\/$/, '');
+        const response = await fetch(apiBase + '/api/providers');
+        const data = await response.json();
+        if (!cancelled) setProviders(data);
+      } catch (err) {
+        if (!cancelled) setError('AI service is not reachable. Start the Kairos AI server or configure VITE_AI_API_URL.');
+      } finally {
+        if (!cancelled) setProviderLoading(false);
+      }
+    };
+    loadProviders();
+    return () => { cancelled = true; };
+  }, []);
+
+  const chooseProvider = (value) => {
+    setProvider(value);
+    localStorage.setItem('kairos-ai-provider', value);
+    setError('');
+  };
 
   const scoreLabel = useMemo(() => {
     if (!result) return '';
@@ -96,41 +93,53 @@ export default function ResumeAnalyzer({ onExtractedData }) {
   const analyze = async (selectedFile) => {
     setLoading(true);
     setError('');
+
     try {
       const extracted = await extractText(selectedFile);
-      const text = extracted.text;
-      if (text.trim().length < 50) throw new Error('The file does not contain enough readable text. If this is a scanned PDF, use a text-based PDF or DOCX.');
+      const text = extracted.text.trim();
 
-      let analysis = localAnalysis(text);
-      try {
-        const apiBase = import.meta.env.VITE_AI_API_URL || '';
-        const response = await fetch(apiBase + '/api/analyze-resume', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text, file_name: selectedFile.name, page_count: extracted.pageCount })
-        });
-        const remote = await response.json().catch(() => ({}));
-        if (response.ok && remote.mode) {
-          analysis = remote;
-          if (remote.mode === 'legacy') setError('Gemini was unavailable, so Kairos used the Smart Resume Analyser engine as a fallback.');
-        } else {
-          setError('Resume AI service failed. Showing the local analyzer instead.');
-        }
-      } catch (apiError) {
-        console.info('AI service unavailable; using local resume analysis.', apiError);
-        setError('AI service could not be reached. Showing local analysis instead.');
+      if (text.length < 50) {
+        throw new Error('The file does not contain enough readable text. If this is a scanned PDF, use a text-based PDF or DOCX.');
+      }
+      if (text.length > 120000) {
+        throw new Error('This resume contains too much text to analyze. Please use a shorter resume.');
       }
 
-      setResult(analysis);
+      const apiBase = (import.meta.env.VITE_AI_API_URL || '').replace(/\/$/, '');
+      const headers = { 'Content-Type': 'application/json' };
+
+      if (auth.currentUser) {
+        headers.Authorization = 'Bearer ' + await auth.currentUser.getIdToken();
+      }
+
+      const response = await fetch(apiBase + '/api/analyze-resume', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          text,
+          file_name: selectedFile.name,
+          page_count: extracted.pageCount,
+          provider
+        })
+      });
+
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.detail || 'The selected AI provider could not analyze the resume.');
+      if (!payload.mode) throw new Error('The AI service returned an invalid analysis.');
+
+      setResult(payload);
+
       try {
-        await saveAnalysis(analysis, selectedFile.name, text);
+        await saveAnalysis(payload, selectedFile.name, text, provider);
         await loadHistory();
       } catch (saveError) {
         console.error('Could not save resume analysis:', saveError);
       }
-      if (onExtractedData) onExtractedData(analysis);
+
+      if (onExtractedData) onExtractedData(payload);
     } catch (err) {
       console.error(err);
+      setResult(null);
       setError(err.message || 'Unable to analyze this resume.');
     } finally {
       setLoading(false);
@@ -139,7 +148,19 @@ export default function ResumeAnalyzer({ onExtractedData }) {
 
   const handleChange = async (event) => {
     const selected = event.target.files?.[0];
+    event.target.value = '';
     if (!selected) return;
+
+    const validType = selected.name.toLowerCase().endsWith('.pdf') || selected.name.toLowerCase().endsWith('.docx');
+    if (!validType) {
+      setError('Only PDF and DOCX files are supported.');
+      return;
+    }
+    if (selected.size > 5 * 1024 * 1024) {
+      setError('Please choose a resume smaller than 5 MB.');
+      return;
+    }
+
     setFile(selected);
     setResult(null);
     await analyze(selected);
@@ -151,9 +172,32 @@ export default function ResumeAnalyzer({ onExtractedData }) {
         <div>
           <p className="eyebrow">AI RESUME REVIEW</p>
           <h2>Turn your resume into a career plan.</h2>
-          <p>Upload a PDF or DOCX. Kairos combines the original Smart Resume Analyser engine with Gemini AI for deeper feedback.</p>
+          <p>Upload a PDF or DOCX and choose whether Gemini or your local Ollama model performs the analysis.</p>
         </div>
         <div className="resume-ai-icon"><FiFileText /></div>
+      </div>
+
+      <div className="ai-provider-picker">
+        <div className="provider-heading">
+          <div>
+            <p className="eyebrow">ANALYSIS ENGINE</p>
+            <h3>Choose how Kairos analyzes your resume</h3>
+          </div>
+          {providerLoading && <span className="provider-checking"><FiLoader className="spin" /> Checking availability</span>}
+        </div>
+        <div className="provider-options">
+          <button type="button" className={provider === 'gemini' ? 'provider-option active' : 'provider-option'} onClick={() => chooseProvider('gemini')} disabled={loading || (!providerLoading && !providers.gemini?.configured)}>
+            <span className="provider-icon"><FiCloud /></span>
+            <span><strong>Gemini AI</strong><small>{providers.gemini?.configured ? 'Cloud analysis · configured' : 'Not configured on the AI server'}</small></span>
+            <span className="provider-radio">{provider === 'gemini' ? '✓' : ''}</span>
+          </button>
+          <button type="button" className={provider === 'local' ? 'provider-option active' : 'provider-option'} onClick={() => chooseProvider('local')} disabled={loading || (!providerLoading && !providers.local?.available)}>
+            <span className="provider-icon"><FiCpu /></span>
+            <span><strong>Local model</strong><small>{providers.local?.available ? 'Ollama · ' + (providers.local.model || 'configured model') : 'Ollama is not reachable'}</small></span>
+            <span className="provider-radio">{provider === 'local' ? '✓' : ''}</span>
+          </button>
+        </div>
+        <p className="provider-note">{provider === 'local' ? 'Local mode keeps resume text on your configured AI server and uses its Ollama model. It must be running before analysis.' : 'Gemini sends the extracted resume text to Google’s Gemini API for analysis.'}</p>
       </div>
 
       <label className="resume-dropzone">
@@ -170,7 +214,7 @@ export default function ResumeAnalyzer({ onExtractedData }) {
         <div className="resume-results">
           <div className="resume-score-card">
             <div className="score-ring" style={{ '--score': `${Math.max(0, Math.min(100, Number(result.score) || 0))}%` }}><strong>{result.score}</strong><span>/100</span></div>
-            <div><p className="eyebrow">{result.mode === 'hybrid' ? 'HYBRID AI + SMART ANALYZER' : result.mode === 'legacy' ? 'SMART RESUME ANALYSIS' : 'LOCAL RESUME ANALYSIS'}</p><h3>{scoreLabel}</h3><p>{result.summary}</p></div>
+            <div><p className="eyebrow">{result.mode === 'gemini' ? 'GEMINI AI ANALYSIS' : 'LOCAL MODEL ANALYSIS'}</p><h3>{scoreLabel}</h3><p>{result.summary}</p></div>
           </div>
 
           {result.contact && (result.contact.email || result.contact.phone) && <section className="resume-contact"><p className="eyebrow">CONTACT FOUND</p><div className="contact-chips">{result.contact.email && <span>{result.contact.email}</span>}{result.contact.phone && <span>{result.contact.phone}</span>}</div></section>}
