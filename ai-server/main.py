@@ -1,18 +1,18 @@
 import json
 import os
 
-from dotenv import load_dotenv
-load_dotenv()
-
 import requests
+from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
+load_dotenv()
+
 app = FastAPI(title="Kairos AI Service")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
-MODEL = os.getenv("GEMINI_MODEL", "gemini-3-flash-preview")
+MODEL = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
 URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 
 class AnalyzeRequest(BaseModel):
@@ -27,7 +27,7 @@ def health():
 def analyze_resume(request: AnalyzeRequest):
     key = os.getenv("GEMINI_API_KEY")
     if not key:
-        return {"mode": "unconfigured", "file_name": request.file_name}
+        raise HTTPException(status_code=503, detail="GEMINI_API_KEY is not configured.")
 
     prompt = (
         "You are Kairos Resume AI. Analyze the resume below. "
@@ -36,9 +36,13 @@ def analyze_resume(request: AnalyzeRequest):
         "Score from 0 to 100. Do not invent facts. Keep arrays concise. "
         "Resume text: " + request.text
     )
+
     payload = {
         "contents": [{"role": "user", "parts": [{"text": prompt}]}],
-        "generationConfig": {"temperature": 0.2, "responseMimeType": "application/json"}
+        "generationConfig": {
+            "responseMimeType": "application/json",
+            "thinkingConfig": {"thinkingLevel": "low"}
+        }
     }
 
     try:
@@ -46,20 +50,28 @@ def analyze_resume(request: AnalyzeRequest):
             URL.format(model=MODEL),
             headers={"Content-Type": "application/json", "x-goog-api-key": key},
             json=payload,
-            timeout=60
+            timeout=90
         )
-        response.raise_for_status()
+        if not response.ok:
+            detail = response.text[:2000]
+            raise HTTPException(status_code=502, detail=f"Gemini API returned HTTP {response.status_code}: {detail}")
+
         data = response.json()
         parts = data.get("candidates", [{}])[0].get("content", {}).get("parts", [])
         output = "".join(part.get("text", "") for part in parts).strip()
+
         if not output:
-            raise ValueError("Gemini returned an empty response.")
+            raise ValueError(f"Gemini returned no text. Raw response: {json.dumps(data)[:2000]}")
+
         result = json.loads(output)
-    except requests.HTTPError as exc:
-        detail = exc.response.text[:1200] if exc.response is not None else str(exc)
-        raise HTTPException(status_code=502, detail=f"Gemini API error: {detail}") from exc
-    except (requests.RequestException, json.JSONDecodeError, ValueError) as exc:
-        raise HTTPException(status_code=502, detail=f"Gemini analysis failed: {exc}") from exc
+    except HTTPException:
+        raise
+    except requests.RequestException as exc:
+        raise HTTPException(status_code=502, detail=f"Could not reach Gemini API: {exc}") from exc
+    except json.JSONDecodeError as exc:
+        raise HTTPException(status_code=502, detail=f"Gemini returned invalid JSON: {exc}") from exc
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Unexpected Gemini server error: {exc}") from exc
 
     result["mode"] = "gemini"
     result["file_name"] = request.file_name
