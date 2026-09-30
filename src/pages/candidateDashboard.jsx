@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { FiBell, FiBriefcase, FiFileText, FiHome, FiLogOut, FiSettings, FiTarget, FiUsers, FiMapPin, FiSend } from 'react-icons/fi';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
-import { getFirestore, collection, getDocs, addDoc, query, where, orderBy, limit, serverTimestamp } from 'firebase/firestore';
+import { getFirestore, collection, doc, getDocs, addDoc, query, where, orderBy, limit, serverTimestamp, updateDoc } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
 import { auth, firebaseApp } from '../firebase';
 import User from '../models/User';
@@ -10,6 +10,45 @@ import '../styles/components/dashboard.css';
 
 const db = getFirestore(firebaseApp);
 const nav = [['overview','Overview',FiHome],['resume','Resume AI',FiFileText],['jobs','Jobs',FiBriefcase],['mentors','Mentors',FiUsers],['applications','Applications',FiTarget]];
+
+const normalize = (value = '') => value.toLowerCase().replace(/[.\/_-]/g, ' ').replace(/\\s+/g, ' ').trim();
+
+function scoreJob(job, resume) {
+  if (!resume) return { score: 0, matchedSkills: [], reasons: [] };
+
+  const resumeSkills = [...new Set([
+    ...(resume.skills || []),
+    ...(resume.recommended_skills || []),
+    ...(resume.ats_keywords || [])
+  ].map(normalize).filter(Boolean))];
+
+  const jobSkills = [...new Set((job.skills || []).map(normalize).filter(Boolean))];
+  const matchedSkills = jobSkills.filter((jobSkill) =>
+    resumeSkills.some((resumeSkill) =>
+      resumeSkill === jobSkill || resumeSkill.includes(jobSkill) || jobSkill.includes(resumeSkill)
+    )
+  );
+
+  const searchableJob = normalize([job.title, job.description, job.company].join(' '));
+  const roles = (resume.recommended_roles || []).map(normalize);
+  const careerField = normalize(resume.career_field || '');
+  const roleMatch = roles.some((role) => role && (searchableJob.includes(role) || role.includes(normalize(job.title))));
+  const fieldMatch = careerField && searchableJob.includes(careerField);
+
+  const skillScore = jobSkills.length ? (matchedSkills.length / jobSkills.length) * 65 : 0;
+  const roleScore = roleMatch ? 25 : fieldMatch ? 18 : 0;
+  const keywordScore = resumeSkills.length
+    ? Math.min(10, resumeSkills.filter((skill) => searchableJob.includes(skill)).length * 2)
+    : 0;
+
+  const score = Math.min(100, Math.round(skillScore + roleScore + keywordScore));
+  const reasons = [];
+  if (matchedSkills.length) reasons.push(`${matchedSkills.length} matching skill${matchedSkills.length > 1 ? 's' : ''}`);
+  if (roleMatch) reasons.push('career role match');
+  else if (fieldMatch) reasons.push('career field match');
+
+  return { score, matchedSkills, reasons };
+}
 
 export default function CandidateDashboard() {
   const navigate = useNavigate();
@@ -26,6 +65,7 @@ export default function CandidateDashboard() {
     if (!data || data.role !== 'candidate') { navigate('/auth/login/candidate',{replace:true}); return; }
     if (!data.profileComplete) { navigate('/profile-setup',{replace:true}); return; }
     setRecord(data);
+    setResumeInsights(data.resumeInsights || null);
     await Promise.all([loadJobs(user.uid), loadApplications(user.uid), loadMentors()]);
   }), [navigate]);
 
@@ -64,6 +104,34 @@ export default function CandidateDashboard() {
     } catch (err) { setMessage('Could not submit the application. Check Firestore permissions.'); }
   };
 
+  const handleResumeInsights = async (analysis) => {
+    if (!analysis || !auth.currentUser) return;
+    setResumeInsights(analysis);
+    try {
+      await updateDoc(doc(db, 'users', auth.currentUser.uid), {
+        resumeInsights: {
+          career_field: analysis.career_field || '',
+          skills: analysis.skills || [],
+          recommended_skills: analysis.recommended_skills || [],
+          recommended_roles: analysis.recommended_roles || [],
+          ats_keywords: analysis.ats_keywords || [],
+          score: Number(analysis.score) || 0,
+          mode: analysis.mode || 'local',
+          updatedAt: new Date().toISOString()
+        }
+      });
+      setMessage('Resume insights saved. Your job recommendations are now personalized.');
+    } catch (err) {
+      console.warn('Could not save resume insights:', err);
+    }
+  };
+
+  const rankedJobs = useMemo(() => {
+    return jobs
+      .map((job) => ({ ...job, match: scoreJob(job, resumeInsights) }))
+      .sort((a, b) => b.match.score - a.match.score);
+  }, [jobs, resumeInsights]);
+
   const profile = record?.profileData || {};
   const skills = profile.skills || [];
   const name = [profile.firstName,profile.lastName].filter(Boolean).join(' ') || 'Candidate';
@@ -91,9 +159,9 @@ export default function CandidateDashboard() {
         <section className="dashboard-grid"><article className="dashboard-panel wide"><p className="eyebrow">RESUME AI</p><h3>Turn your resume into a plan.</h3><p>Get an ATS score, skills, career direction, improvement suggestions and interview questions.</p><button className="primary-btn" onClick={() => setActive('resume')}><FiFileText/> Analyze resume</button></article><article className="dashboard-panel"><p className="eyebrow">PROFILE</p><h3>{profile.headline || 'Your professional profile'}</h3><p>{profile.location || 'Location not added'} · {profile.education?.[0]?.institution || 'Education not added'}</p><div className="chip-list">{skills.slice(0,6).map((s)=><span key={s}>{s}</span>)}</div></article></section>
       </>}
 
-      {active==='resume' && <section className="dashboard-panel standalone"><ResumeAnalyzer onExtractedData={() => {}} /></section>}
+      {active==='resume' && <section className="dashboard-panel standalone"><ResumeAnalyzer onExtractedData={handleResumeInsights} /></section>}
 
-      {active==='jobs' && <section className="dashboard-panel standalone"><div className="section-heading"><div><p className="eyebrow">OPPORTUNITIES</p><h2>Jobs matched to your profile</h2></div><span>{jobs.length} roles</span></div><div className="job-list">{jobs.length ? jobs.map((job)=><article className="job-card" key={job.id}><div><h3>{job.title}</h3><p>{job.company || 'Hiring team'} · <FiMapPin/> {job.location || 'Remote'}</p><div className="chip-list">{(job.skills || []).slice(0,5).map((s)=><span key={s}>{s}</span>)}</div></div><button className="primary-btn" onClick={()=>apply(job)}><FiSend/> Apply</button></article>) : <div className="empty-state"><FiBriefcase size={34}/><h2>No jobs yet</h2><p>Manager-posted opportunities will appear here.</p></div>}</div></section>}
+      {active==='jobs' && <section className="dashboard-panel standalone"><div className="section-heading"><div><p className="eyebrow">AI JOB MATCHING</p><h2>Jobs matched to your resume</h2><p className="section-subtitle">{resumeInsights ? `Ranked using your ${resumeInsights.career_field || 'career'} profile and detected skills.` : 'Analyze your resume first to unlock personalized job matching.'}</p></div><span>{jobs.length} roles</span></div>{!resumeInsights && <div className="dashboard-message"><FiFileText/> Analyze your resume in Resume AI to personalize these recommendations.</div>}<div className="job-list">{rankedJobs.length ? rankedJobs.map((job)=><article className="job-card" key={job.id}><div className="job-main"><div className="job-title-row"><h3>{job.title}</h3>{resumeInsights && <span className="match-badge">{job.match.score}% match</span>}</div><p>{job.company || 'Hiring team'} · <FiMapPin/> {job.location || 'Remote'}</p><div className="chip-list">{(job.skills || []).slice(0,6).map((s)=><span key={s} className={job.match.matchedSkills.some((m)=>normalize(m)===normalize(s)||normalize(m).includes(normalize(s))||normalize(s).includes(normalize(m))) ? 'matched-chip' : ''}>{s}</span>)}</div>{resumeInsights && job.match.reasons.length > 0 && <p className="match-reason">{job.match.reasons.join(' · ')}</p>}</div><button className="primary-btn" onClick={()=>apply(job)}><FiSend/> Apply</button></article>) : <div className="empty-state"><FiBriefcase size={34}/><h2>No jobs yet</h2><p>Manager-posted opportunities will appear here.</p></div>}</div></section>}
 
       {active==='mentors' && <section className="dashboard-panel standalone"><p className="eyebrow">MENTORSHIP</p><h2>Connect with industry professionals</h2><div className="mentor-grid">{mentors.length ? mentors.map((mentor)=><article className="mentor-card" key={mentor.id}><div className="avatar">{(mentor.profileData?.firstName || 'M')[0]}</div><h3>{[mentor.profileData?.firstName,mentor.profileData?.lastName].filter(Boolean).join(' ') || 'Industry mentor'}</h3><p>{mentor.profileData?.headline || 'Hiring manager / industry professional'}</p><span>{mentor.profileData?.location || 'Location not listed'}</span><button className="secondary-btn">Request mentorship</button></article>) : <div className="empty-state"><FiUsers size={34}/><h2>No mentors yet</h2><p>Managers who complete their profiles will appear here.</p></div>}</div></section>}
 
