@@ -1,6 +1,12 @@
 import { useNavigate, useParams } from 'react-router-dom';
-import { useEffect, useState } from 'react';
-import { createUserWithEmailAndPassword, getRedirectResult, signInWithRedirect, updateProfile } from 'firebase/auth';
+import { useState } from 'react';
+import {
+  browserLocalPersistence,
+  createUserWithEmailAndPassword,
+  setPersistence,
+  signInWithPopup,
+  updateProfile,
+} from 'firebase/auth';
 import { auth, googleProvider } from '../../firebase';
 import User from '../../models/User';
 import '../../styles/components/auth.css';
@@ -11,84 +17,63 @@ export default function Signup() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const finish = async (user, name = '') => {
+  const finishSignup = async (user, name = '') => {
     const existing = await User.getById(user.uid);
+
     if (existing && existing.role !== role) {
       throw new Error(`This account is already registered as ${existing.role}.`);
     }
+
     if (!existing) {
       await User.create(user.uid, {
         role,
         email: user.email || '',
-        name: name || user.displayName || ''
+        name: name || user.displayName || '',
       });
     }
+
     navigate('/profile-setup', { replace: true });
   };
-
-  useEffect(() => {
-    let active = true;
-    const finishRedirect = async () => {
-      try {
-        await setPersistence(auth, browserLocalPersistence);
-        const result = await getRedirectResult(auth);
-        if (result?.user && active) {
-          setLoading(true);
-          await finish(result.user, result.user.displayName || '');
-        }
-      } catch (err) {
-        if (!active) return;
-        const messages = {
-          'auth/account-exists-with-different-credential': 'An account already exists with this email using another sign-in method.',
-          'auth/unauthorized-domain': 'This site is not authorized for Google sign-in in Firebase.',
-          'auth/operation-not-supported-in-this-environment': 'Google redirect sign-in is not supported in this browser environment.'
-        };
-        setError(messages[err.code] || err.message || 'Google sign-up failed.');
-      } finally {
-        if (active) setLoading(false);
-      }
-    };
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (!active || !user) return;
-      try {
-        const result = await getRedirectResult(auth);
-        if (result?.user || user) {
-          setLoading(true);
-          await finish(user, user.displayName || '');
-        }
-      } catch (err) {
-        if (active) setError(err.message || 'Unable to complete Google sign-up.');
-      } finally {
-        if (active) setLoading(false);
-      }
-    });
-    finishRedirect();
-    return () => { active = false; unsubscribe(); };
-  }, []);
 
   const handleSubmit = async (event) => {
     event.preventDefault();
     setLoading(true);
     setError('');
+
     const form = new FormData(event.currentTarget);
     const name = String(form.get('name') || '').trim();
     const email = String(form.get('email') || '').trim();
     const password = String(form.get('password') || '');
     const confirm = String(form.get('confirmPassword') || '');
 
-    if (name.length < 2) { setError('Please enter your full name.'); setLoading(false); return; }
-    if (password.length < 8) { setError('Password must be at least 8 characters.'); setLoading(false); return; }
-    if (password !== confirm) { setError('Passwords do not match.'); setLoading(false); return; }
+    if (name.length < 2) {
+      setError('Please enter your full name.');
+      setLoading(false);
+      return;
+    }
+
+    if (password.length < 8) {
+      setError('Password must be at least 8 characters.');
+      setLoading(false);
+      return;
+    }
+
+    if (password !== confirm) {
+      setError('Passwords do not match.');
+      setLoading(false);
+      return;
+    }
 
     try {
+      await setPersistence(auth, browserLocalPersistence);
       const credential = await createUserWithEmailAndPassword(auth, email, password);
       await updateProfile(credential.user, { displayName: name });
-      await finish(credential.user, name);
+      await finishSignup(credential.user, name);
     } catch (err) {
       const messages = {
         'auth/email-already-in-use': 'An account with this email already exists. Try logging in.',
         'auth/invalid-email': 'Please enter a valid email address.',
-        'auth/weak-password': 'Choose a stronger password.'
+        'auth/weak-password': 'Choose a stronger password.',
       };
       setError(messages[err.code] || err.message || 'Unable to create the account.');
     } finally {
@@ -99,12 +84,22 @@ export default function Signup() {
   const handleGoogle = async () => {
     setLoading(true);
     setError('');
+
     try {
       await setPersistence(auth, browserLocalPersistence);
-      await signInWithRedirect(auth, googleProvider);
+      const credential = await signInWithPopup(auth, googleProvider);
+      await finishSignup(credential.user, credential.user.displayName || '');
     } catch (err) {
+      const messages = {
+        'auth/popup-closed-by-user': 'The Google sign-in window was closed before account creation finished.',
+        'auth/popup-blocked': 'Your browser blocked the Google sign-in popup. Allow popups for this site and try again.',
+        'auth/account-exists-with-different-credential': 'An account already exists with this email using another sign-in method. Try logging in instead.',
+        'auth/unauthorized-domain': 'This site is not authorized for Google sign-in in Firebase.',
+        'auth/cancelled-popup-request': 'Another Google sign-in window is already open.',
+      };
+      setError(messages[err.code] || err.message || 'Google sign-up failed.');
+    } finally {
       setLoading(false);
-      setError(err.message || 'Unable to start Google sign-up.');
     }
   };
 
@@ -116,7 +111,9 @@ export default function Signup() {
         <h2>Create your {role} account</h2>
         <p className="lead">Build your profile once, then use the workspace for your role.</p>
         {error && <div className="auth-error">{error}</div>}
-        <button className="social-button google-btn" type="button" onClick={handleGoogle} disabled={loading}>Continue with Google</button>
+        <button className="social-button google-btn" type="button" onClick={handleGoogle} disabled={loading}>
+          {loading ? 'Creating account…' : 'Continue with Google'}
+        </button>
         <div className="auth-divider"><span>OR</span></div>
         <form className="auth-form" onSubmit={handleSubmit}>
           <div className="form-group"><label htmlFor="name">Full name</label><input id="name" name="name" required placeholder="Lakshya Veer Singh" /></div>
