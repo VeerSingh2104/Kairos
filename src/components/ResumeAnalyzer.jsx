@@ -53,7 +53,15 @@ export default function ResumeAnalyzer({ onExtractedData }) {
         const apiBase = (import.meta.env.VITE_AI_API_URL || '').replace(/\/$/, '');
         const response = await fetch(apiBase + '/api/providers');
         const data = await response.json();
-        if (!cancelled) setProviders(data);
+        if (!cancelled) {
+          setProviders(data);
+          const currentAvailable = provider === 'local' ? data.local?.available : data.gemini?.configured;
+          if (!currentAvailable) {
+            const fallback = data.gemini?.configured ? 'gemini' : data.local?.available ? 'local' : provider;
+            setProvider(fallback);
+            localStorage.setItem('kairos-ai-provider', fallback);
+          }
+        }
       } catch (err) {
         if (!cancelled) setError('AI service is not reachable. Start the Kairos AI server or configure VITE_AI_API_URL.');
       } finally {
@@ -193,7 +201,7 @@ export default function ResumeAnalyzer({ onExtractedData }) {
           </button>
           <button type="button" className={provider === 'local' ? 'provider-option active' : 'provider-option'} onClick={() => chooseProvider('local')} disabled={loading || (!providerLoading && !providers.local?.available)}>
             <span className="provider-icon"><FiCpu /></span>
-            <span><strong>Local model</strong><small>{providers.local?.available ? 'Ollama · ' + (providers.local.model || 'configured model') : 'Ollama is not reachable'}</small></span>
+            <span><strong>Local model</strong><small>{providers.local?.available ? 'Ollama · ' + (providers.local.model || 'configured model') : providers.local?.server_available ? 'Ollama is running, but the selected model is not installed' : 'Ollama is not reachable'}</small></span>
             <span className="provider-radio">{provider === 'local' ? '✓' : ''}</span>
           </button>
         </div>
